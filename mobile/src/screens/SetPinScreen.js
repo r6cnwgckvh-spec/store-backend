@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 
-export default function SetPinScreen() {
+export default function SetPinScreen({ setupToken }) {
   const { setPin } = useAuth();
   const [pin, setPinState] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -13,8 +13,7 @@ export default function SetPinScreen() {
     if (pin !== confirm) { Alert.alert('Error', 'PINs do not match'); return; }
     setLoading(true);
     try {
-      await setPin(pin);
-      // AuthContext will set token + user, AppContent auto-navigates to main app
+      await setPin(pin, setupToken);
     } catch (e) {
       Alert.alert('Error', e.message);
     }

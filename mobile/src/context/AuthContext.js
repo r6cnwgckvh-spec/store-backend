@@ -58,6 +58,10 @@ export function AuthProvider({ children }) {
       await storage.setToken(data.token);
       setToken(data.token);
     }
+    if (data.setupToken) {
+      await storage.setToken(data.setupToken);
+      setToken(data.setupToken);
+    }
     return data;
   };
 
@@ -65,8 +69,10 @@ export function AuthProvider({ children }) {
     return api.post('/auth/check-status', { email });
   };
 
-  const setPin = async (pin) => {
-    const data = await api.post('/auth/set-pin', { pin });
+  const setPin = async (pin, setupToken) => {
+    const data = await (setupToken
+      ? api.postWithToken('/auth/set-pin', { pin }, setupToken)
+      : api.post('/auth/set-pin', { pin }));
     const hash = await sha256(pin);
     await storage.setPinHash(hash);
     await storage.setToken(data.token);

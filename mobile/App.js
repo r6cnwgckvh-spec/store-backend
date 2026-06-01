@@ -108,6 +108,7 @@ function AppContent() {
 
   const [authView, setAuthView] = useState('login');
   const [pendingEmail, setPendingEmail] = useState('');
+  const [setupToken, setSetupToken] = useState(null);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -117,19 +118,6 @@ function AppContent() {
     return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    if (loading) return;
-    if (token && user) {
-      if (!user.pin_hash && user.status === 'approved') {
-        setAuthView('setpin');
-      } else {
-        setAuthView('login');
-      }
-    } else {
-      setAuthView('login');
-    }
-  }, [token, user, loading]);
-
   if (loading) {
     return <View style={{ flex: 1, backgroundColor: '#1a1a2e', justifyContent: 'center', alignItems: 'center' }}>
       <Text style={{ color: '#fff', fontSize: 16 }}>Loading...</Text>
@@ -137,6 +125,9 @@ function AppContent() {
   }
 
   if (token && user) {
+    if (user.status === 'approved' && !user.has_pin) {
+      return <SetPinScreen />;
+    }
     return (
       <SidebarContext.Provider value={{
         sidebarVisible,
@@ -162,28 +153,31 @@ function AppContent() {
     );
   }
 
-  switch (authView) {
-    case 'register':
-      return <RegisterScreen
-        onBack={() => setAuthView('login')}
-        onPending={(email) => { setPendingEmail(email); setAuthView('pending'); }}
-        onSetPin={() => setAuthView('setpin')}
-      />;
-    case 'pending':
-      return <PendingScreen
-        email={pendingEmail}
-        onApproved={() => setAuthView('setpin')}
-        onRejected={(msg) => alert(msg)}
-        onBack={() => setAuthView('login')}
-      />;
-    case 'setpin':
-      return <SetPinScreen />;
-    default:
-      return <LoginScreen
-        onRegister={() => setAuthView('register')}
-        onLoginDone={() => {}}
-      />;
+  if (authView === 'setpin') {
+    return <SetPinScreen setupToken={setupToken} />;
   }
+
+  if (authView === 'pending') {
+    return <PendingScreen
+      email={pendingEmail}
+      onApproved={(st) => { setSetupToken(st); setAuthView('setpin'); }}
+      onRejected={(msg) => alert(msg)}
+      onBack={() => setAuthView('login')}
+    />;
+  }
+
+  if (authView === 'register') {
+    return <RegisterScreen
+      onBack={() => setAuthView('login')}
+      onPending={(email) => { setPendingEmail(email); setAuthView('pending'); }}
+      onSetPin={() => setAuthView('setpin')}
+    />;
+  }
+
+  return <LoginScreen
+    onRegister={() => setAuthView('register')}
+    onLoginDone={() => {}}
+  />;
 }
 
 export default function App() {

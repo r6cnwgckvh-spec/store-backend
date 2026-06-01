@@ -30,6 +30,13 @@ async function handleResponse(res) {
 }
 
 export const api = {
+  async postWithToken(endpoint, body, customToken) {
+    const res = await fetch(`${API_BASE}${endpoint}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${customToken}` }, body: JSON.stringify(body),
+    });
+    return handleResponse(res);
+  },
+
   async get(endpoint) {
     const res = await fetch(`${API_BASE}${endpoint}`, { headers: await headers() });
     return handleResponse(res);

@@ -13,7 +13,7 @@ export default function PendingScreen({ email, onApproved, onRejected, onBack })
         const result = await checkStatus(email);
         if (result.status === 'approved') {
           clearInterval(intervalRef.current);
-          onApproved();
+          onApproved(result.setupToken || null);
         } else if (result.status === 'rejected') {
           clearInterval(intervalRef.current);
           onRejected(result.message || 'Your registration was rejected.');
