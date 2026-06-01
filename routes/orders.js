@@ -38,10 +38,12 @@ router.get('/', (req, res) => {
 });
 
 router.get('/:id', (req, res) => {
-  const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(req.params.id);
+  const id = parseInt(req.params.id);
+  if (isNaN(id) || id < 1) return res.status(400).json({ error: 'Invalid order ID' });
+  const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(id);
   if (!order) return res.status(404).json({ error: 'Order not found' });
-  const items = db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(req.params.id);
-  const returns = db.prepare('SELECT * FROM returns WHERE order_id = ?').all(req.params.id);
+  const items = db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(id);
+  const returns = db.prepare('SELECT * FROM returns WHERE order_id = ?').all(id);
   res.json({ ...order, items, returns });
 });
 
@@ -113,13 +115,15 @@ router.post('/', (req, res) => {
 });
 
 router.post('/:id/return', (req, res) => {
+  const id = parseInt(req.params.id);
+  if (isNaN(id) || id < 1) return res.status(400).json({ error: 'Invalid order ID' });
   const { items } = req.body;
   if (!items || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ error: 'Return items required' });
   }
 
   const transaction = db.transaction(() => {
-    const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(req.params.id);
+    const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(id);
     if (!order) throw new Error('Order not found');
 
     let totalRefund = 0;

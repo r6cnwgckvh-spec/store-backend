@@ -1,5 +1,7 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, SafeAreaView, Linking } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, Linking } from 'react-native';
+
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 const SIDEBAR_WIDTH = width * 0.75;
@@ -17,7 +19,7 @@ const menuItems = [
   { icon: '👑', label: 'Admin Panel', screen: 'AdminPanel' },
 ];
 
-export default function Sidebar({ visible, onClose, navigation }) {
+export default function Sidebar({ visible, onClose, navigationRef }) {
   const slideAnim = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -36,16 +38,18 @@ export default function Sidebar({ visible, onClose, navigation }) {
   }, [visible]);
 
   const handlePress = (item) => {
+    const nav = navigationRef?.current;
+    if (!nav) return;
     onClose();
     setTimeout(() => {
       if (item.screen === 'Scanner') {
-        navigation.navigate('Scanner', { mode: 'sell' });
+        nav.navigate('Scanner', { mode: 'sell' });
       } else if (['Products', 'Cart', 'Orders', 'Customers'].includes(item.screen)) {
-        navigation.navigate('Main', { screen: item.screen });
+        nav.navigate('Main', { screen: item.screen });
       } else if (item.screen === 'AdminPanel') {
         Linking.openURL('https://store-backend-npao.onrender.com/admin/');
       } else {
-        navigation.navigate(item.screen);
+        nav.navigate(item.screen);
       }
     }, 250);
   };

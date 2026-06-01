@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, Alert, SafeAreaView, Platform } from 'react-native';
+import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { api } from '../api';
 import { formatCurrency, formatDate, stockStatus, getImageUrl } from '../utils/helpers';
 
@@ -31,7 +32,7 @@ export default function ProductDetailScreen({ route, navigation }) {
   const st = stockStatus(product.stock);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#f5f5f5', paddingTop: Platform.OS === 'android' ? 25 : 0 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#f5f5f5' }}>
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         {product.image_url ? (

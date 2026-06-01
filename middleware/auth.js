@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 const db = require('../database');
 
-const publicRoutes = ['/api/health', '/api/auth/login', '/api/auth/setup', '/api/auth/status',
+const publicRoutes = ['/api/health', '/api/auth/login', '/api/auth/status',
   '/api/auth/register', '/api/auth/check-status',
   '/api/images/', '/api/admin/'];
 

@@ -32,7 +32,9 @@ router.get('/:id', (req, res) => {
 });
 
 router.get('/:id/orders', (req, res) => {
-  const orders = db.prepare('SELECT * FROM orders WHERE customer_id = ? ORDER BY created_at DESC').all(req.params.id);
+  const id = parseInt(req.params.id);
+  if (isNaN(id) || id < 1) return res.status(400).json({ error: 'Invalid customer ID' });
+  const orders = db.prepare('SELECT * FROM orders WHERE customer_id = ? ORDER BY created_at DESC').all(id);
   res.json(orders);
 });
 
@@ -75,8 +77,10 @@ router.put('/:id', (req, res) => {
 });
 
 router.delete('/:id', (req, res) => {
+  const id = parseInt(req.params.id);
+  if (isNaN(id) || id < 1) return res.status(400).json({ error: 'Invalid customer ID' });
   try {
-    const result = db.prepare('DELETE FROM customers WHERE id = ?').run(req.params.id);
+    const result = db.prepare('DELETE FROM customers WHERE id = ?').run(id);
     if (result.changes === 0) return res.status(404).json({ error: 'Customer not found' });
     res.json({ message: 'Customer deleted' });
   } catch (err) {

@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, Image, StyleSheet, FlatList, TouchableOpacity, TextInput, RefreshControl, SafeAreaView, Platform } from 'react-native';
+import { View, Text, Image, StyleSheet, FlatList, TouchableOpacity, TextInput, RefreshControl } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../api';
 import { formatCurrency, stockStatus, getImageUrl } from '../utils/helpers';
@@ -114,7 +115,7 @@ export default function ProductsScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#f5f5f5', paddingTop: Platform.OS === 'android' ? 25 : 0 },
+  safe: { flex: 1, backgroundColor: '#f5f5f5' },
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
   title: { fontSize: 22, fontWeight: 'bold', color: '#1a1a2e' },
   addBtn: { backgroundColor: '#007bff', borderRadius: 24, paddingHorizontal: 18, paddingVertical: 8 },

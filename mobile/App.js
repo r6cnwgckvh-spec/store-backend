@@ -4,8 +4,10 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Text, View, Platform } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { SidebarContext } from './src/context/SidebarContext';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import PendingScreen from './src/screens/PendingScreen';
@@ -28,8 +30,6 @@ import Sidebar from './src/components/Sidebar';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
-
-export const SidebarContext = React.createContext();
 
 function TabIcon({ label, focused }) {
   const icons = { Home: '🏠', Products: '📦', Cart: '🛒', Orders: '📋', Customers: '👥' };
@@ -147,7 +147,7 @@ function AppContent() {
         <Sidebar
           visible={sidebarVisible}
           onClose={() => setSidebarVisible(false)}
-          navigation={navigationRef.current}
+          navigationRef={navigationRef}
         />
       </SidebarContext.Provider>
     );
@@ -182,8 +182,10 @@ function AppContent() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }
