@@ -1,0 +1,6 @@
+node_modules/
+certs/
+store.db
+*.db-journal
+store.db-wal
+store.db-shm

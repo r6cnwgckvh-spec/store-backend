@@ -1,0 +1,171 @@
+const express = require('express');
+const router = express.Router();
+const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
+const rateLimit = require('express-rate-limit');
+const db = require('../database');
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many attempts. Try again in 15 minutes.' },
+});
+
+function hashPin(pin) {
+  return crypto.createHash('sha256').update(pin).digest('hex');
+}
+
+function getSecret() {
+  const row = db.prepare('SELECT jwt_secret FROM store_settings WHERE id = 1').get();
+  if (row?.jwt_secret) return row.jwt_secret;
+  const secret = crypto.randomBytes(32).toString('hex');
+  db.prepare('UPDATE store_settings SET jwt_secret = ? WHERE id = 1').run(secret);
+  return secret;
+}
+
+function signToken(user) {
+  return jwt.sign({ userId: user.id, role: user.role, email: user.email }, getSecret(), { expiresIn: '30d' });
+}
+
+function sanitizeUser(user) {
+  if (!user) return null;
+  return { id: user.id, name: user.name, email: user.email, status: user.status, role: user.role, created_at: user.created_at };
+}
+
+router.get('/status', (req, res) => {
+  const count = db.prepare('SELECT COUNT(*) as count FROM users').get().count;
+  const legacy = db.prepare('SELECT auth_pin FROM store_settings WHERE id = 1').get();
+  res.json({ hasPin: count > 0 || !!(legacy?.auth_pin) });
+});
+
+router.post('/register', authLimiter, (req, res) => {
+  const { name, email } = req.body;
+  if (!name || typeof name !== 'string' || !name.trim()) return res.status(400).json({ error: 'Name is required' });
+  if (!email || typeof email !== 'string' || !email.includes('@')) return res.status(400).json({ error: 'Valid email is required' });
+
+  const existing = db.prepare('SELECT id, status FROM users WHERE email = ?').get(email.trim().toLowerCase());
+  if (existing) {
+    if (existing.status === 'pending') return res.status(400).json({ error: 'Registration already submitted. Waiting for admin approval.' });
+    if (existing.status === 'approved') return res.status(400).json({ error: 'This email is already registered. Please login.' });
+    if (existing.status === 'rejected') return res.status(400).json({ error: 'Your registration was rejected. Contact admin.' });
+  }
+
+  const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get().count;
+  const role = userCount === 0 ? 'admin' : 'user';
+  const status = role === 'admin' ? 'approved' : 'pending';
+
+  try {
+    const result = db.prepare('INSERT INTO users (email, name, status, role) VALUES (?, ?, ?, ?)').run(
+      email.trim().toLowerCase(), name.trim(), status, role
+    );
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(result.lastInsertRowid);
+
+    if (role === 'admin') {
+      const token = signToken(user);
+      return res.json({ token, user: sanitizeUser(user), message: 'Welcome! You are the admin. Set your PIN to continue.' });
+    }
+    res.json({ user: sanitizeUser(user), message: 'Registration submitted. Wait for admin approval.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/login', authLimiter, (req, res) => {
+  const { pin, email } = req.body;
+  if (!pin) return res.status(400).json({ error: 'PIN is required' });
+
+  // Try new multi-user login
+  if (email) {
+    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email.trim().toLowerCase());
+    if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+    if (user.status !== 'approved') return res.status(403).json({ error: 'Account not approved yet' });
+    if (!user.pin_hash) return res.status(400).json({ error: 'PIN not set up. Please set your PIN first.' });
+    if (hashPin(pin) !== user.pin_hash) return res.status(401).json({ error: 'Wrong PIN' });
+    const token = signToken(user);
+    return res.json({ token, user: sanitizeUser(user) });
+  }
+
+  // Legacy single-user auth (backward compat)
+  const row = db.prepare('SELECT auth_pin FROM store_settings WHERE id = 1').get();
+  if (row?.auth_pin) {
+    if (hashPin(pin) === row.auth_pin) {
+      const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get().count;
+      if (userCount === 0) {
+        const secret = getSecret();
+        const token = jwt.sign({ role: 'admin' }, secret, { expiresIn: '30d' });
+        return res.json({ token, user: { id: 0, name: 'Admin', email: '', role: 'admin' } });
+      }
+    }
+  }
+
+  return res.status(401).json({ error: 'Wrong PIN' });
+});
+
+router.post('/check-status', authLimiter, (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email is required' });
+  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email.trim().toLowerCase());
+  if (!user) return res.json({ registered: false });
+  if (user.status === 'pending') return res.json({ status: 'pending', message: 'Waiting for admin approval.' });
+  if (user.status === 'rejected') return res.json({ status: 'rejected', message: 'Registration rejected.' });
+  if (user.status === 'approved') return res.json({
+    status: 'approved', hasPin: !!user.pin_hash, user: sanitizeUser(user),
+    message: user.pin_hash ? 'You can login with your PIN.' : 'Set your PIN to continue.',
+  });
+});
+
+router.post('/set-pin', (req, res) => {
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith('Bearer ')) return res.status(401).json({ error: 'Authentication required' });
+  const secret = getSecret();
+  let decoded;
+  try { decoded = jwt.verify(header.slice(7), secret); } catch { return res.status(401).json({ error: 'Invalid or expired token' }); }
+
+  const { pin } = req.body;
+  if (!pin || typeof pin !== 'string' || pin.length < 4) return res.status(400).json({ error: 'PIN must be at least 4 digits' });
+
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(decoded.userId);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  if (user.status !== 'approved') return res.status(403).json({ error: 'Account not approved yet' });
+  if (user.pin_hash) return res.status(400).json({ error: 'PIN already set. Use change-pin to update.' });
+
+  db.prepare('UPDATE users SET pin_hash = ? WHERE id = ?').run(hashPin(pin), user.id);
+  const token = signToken(user);
+  res.json({ token, user: sanitizeUser(user), message: 'PIN set successfully!' });
+});
+
+router.post('/change-pin', authLimiter, (req, res) => {
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith('Bearer ')) return res.status(401).json({ error: 'Authentication required' });
+  const secret = getSecret();
+  let decoded;
+  try { decoded = jwt.verify(header.slice(7), secret); } catch { return res.status(401).json({ error: 'Invalid or expired token' }); }
+
+  const { oldPin, newPin } = req.body;
+  if (!oldPin || !newPin || newPin.length < 4) return res.status(400).json({ error: 'New PIN must be at least 4 digits' });
+
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(decoded.userId);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  if (hashPin(oldPin) !== user.pin_hash) return res.status(401).json({ error: 'Wrong current PIN' });
+
+  db.prepare('UPDATE users SET pin_hash = ? WHERE id = ?').run(hashPin(newPin), user.id);
+  const token = signToken({ ...user, pin_hash: hashPin(newPin) });
+  res.json({ token, message: 'PIN changed successfully' });
+});
+
+router.get('/me', (req, res) => {
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith('Bearer ')) return res.status(401).json({ error: 'Authentication required' });
+  try {
+    const decoded = jwt.verify(header.slice(7), getSecret());
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(decoded.userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json(sanitizeUser(user));
+  } catch {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+});
+
+module.exports = router;
