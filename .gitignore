@@ -10,3 +10,10 @@ dist/
 *.db-shm
 *.db-wal
 .gitignore_backend
+*.json
+!package.json
+!package-lock.json
+!app.json
+!eas.json
+stderr*.txt
+stdout*.txt

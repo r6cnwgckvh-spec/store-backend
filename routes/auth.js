@@ -139,8 +139,9 @@ router.post('/set-pin', (req, res) => {
   if (user.pin_hash) return res.status(400).json({ error: 'PIN already set. Use change-pin to update.' });
 
   db.prepare('UPDATE users SET pin_hash = ? WHERE id = ?').run(hashPin(pin), user.id);
-  const token = signToken(user);
-  res.json({ token, user: sanitizeUser(user), message: 'PIN set successfully!' });
+  const updated = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
+  const token = signToken(updated);
+  res.json({ token, user: sanitizeUser(updated), message: 'PIN set successfully!' });
 });
 
 router.post('/change-pin', authLimiter, (req, res) => {
