@@ -23,7 +23,7 @@ const imagesRouter = require('./routes/images');
 const adminRouter = require('./routes/admin');
 const authMiddleware = require('./middleware/auth');
 
-app.use(helmet({ crossOriginResourcePolicy: false }));
+app.use(helmet({ crossOriginResourcePolicy: false, contentSecurityPolicy: false }));
 app.disable('x-powered-by');
 
 const globalLimiter = rateLimit({
