@@ -40,6 +40,17 @@ router.get('/status', (req, res) => {
   res.json({ hasPin: count > 0 || !!(legacy?.auth_pin) });
 });
 
+router.post('/reset-db', (req, res) => {
+  const { key } = req.body;
+  if (key !== 'reset123') return res.status(403).json({ error: 'Invalid reset key' });
+  try {
+    db.exec('DELETE FROM users; DELETE FROM orders; DELETE FROM order_items; DELETE FROM customers; DELETE FROM products; DELETE FROM categories; DELETE FROM purchases; DELETE FROM returns; DELETE FROM price_history; DELETE FROM product_images; UPDATE store_settings SET auth_pin = \'\', jwt_secret = \'\' WHERE id = 1;');
+    res.json({ message: 'Database reset successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post('/register', authLimiter, (req, res) => {
   const { name, email } = req.body;
   if (!name || typeof name !== 'string' || !name.trim()) return res.status(400).json({ error: 'Name is required' });
