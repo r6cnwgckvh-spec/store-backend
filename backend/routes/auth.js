@@ -31,7 +31,7 @@ function signToken(user) {
 
 function sanitizeUser(user) {
   if (!user) return null;
-  return { id: user.id, name: user.name, email: user.email, status: user.status, role: user.role, created_at: user.created_at };
+  return { id: user.id, name: user.name, email: user.email, status: user.status, role: user.role, has_pin: !!user.pin_hash, created_at: user.created_at };
 }
 
 router.get('/status', (req, res) => {
@@ -110,10 +110,17 @@ router.post('/check-status', authLimiter, (req, res) => {
   if (!user) return res.json({ registered: false });
   if (user.status === 'pending') return res.json({ status: 'pending', message: 'Waiting for admin approval.' });
   if (user.status === 'rejected') return res.json({ status: 'rejected', message: 'Registration rejected.' });
-  if (user.status === 'approved') return res.json({
-    status: 'approved', hasPin: !!user.pin_hash, user: sanitizeUser(user),
-    message: user.pin_hash ? 'You can login with your PIN.' : 'Set your PIN to continue.',
-  });
+  if (user.status === 'approved') {
+    const result = { status: 'approved', hasPin: !!user.pin_hash, user: sanitizeUser(user) };
+    if (!user.pin_hash) {
+      const setupToken = jwt.sign({ userId: user.id, role: user.role, purpose: 'setup' }, getSecret(), { expiresIn: '1h' });
+      result.setupToken = setupToken;
+      result.message = 'Set your PIN to continue.';
+    } else {
+      result.message = 'You can login with your PIN.';
+    }
+    return res.json(result);
+  }
 });
 
 router.post('/set-pin', (req, res) => {
