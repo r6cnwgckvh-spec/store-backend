@@ -15,12 +15,14 @@ async function headers(extra = {}) {
 
 async function handleResponse(res) {
   if (res.status === 401) {
+    let msg = 'Session expired. Please login again.';
+    try { const j = await res.json(); msg = j.error || msg; } catch {}
     const hasToken = !!(await getToken());
     if (hasToken) {
       await clearToken();
       if (onUnauthorized) onUnauthorized();
     }
-    throw new Error('Session expired. Please login again.');
+    throw new Error(msg);
   }
   if (!res.ok) {
     let msg = `Server error ${res.status}`;

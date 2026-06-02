@@ -69,8 +69,29 @@ router.delete('/users/:id', (req, res) => {
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
   if (!user) return res.status(404).json({ error: 'User not found' });
   if (user.role === 'admin') return res.status(400).json({ error: 'Cannot delete admin user' });
-  db.prepare('DELETE FROM users WHERE id = ?').run(id);
-  res.json({ message: 'User deleted' });
+  const transaction = db.transaction(() => {
+    const prodIds = db.prepare('SELECT id FROM products WHERE user_id = ?').all(id).map(r => r.id);
+    for (const pid of prodIds) {
+      db.prepare('DELETE FROM order_items WHERE product_id = ?').run(pid);
+    }
+    db.prepare('DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE user_id = ?)').run(id);
+    db.prepare('DELETE FROM orders WHERE user_id = ?').run(id);
+    db.prepare('DELETE FROM products WHERE user_id = ?').run(id);
+    db.prepare('DELETE FROM customers WHERE user_id = ?').run(id);
+    db.prepare('DELETE FROM purchases WHERE user_id = ?').run(id);
+    db.prepare('DELETE FROM categories WHERE user_id = ?').run(id);
+    db.prepare('DELETE FROM shopping_list_items WHERE list_id IN (SELECT id FROM shopping_lists WHERE user_id = ?)').run(id);
+    db.prepare('DELETE FROM shopping_lists WHERE user_id = ?').run(id);
+    db.prepare('DELETE FROM bills WHERE user_id = ?').run(id);
+    db.prepare('DELETE FROM store_settings WHERE user_id = ?').run(id);
+    db.prepare('DELETE FROM users WHERE id = ?').run(id);
+  });
+  try {
+    transaction();
+    res.json({ message: 'User and all associated data permanently deleted' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;

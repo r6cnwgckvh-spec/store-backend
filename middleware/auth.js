@@ -1,8 +1,9 @@
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const db = require('../database');
 
 const publicRoutes = ['/api/health', '/api/auth/login', '/api/auth/status',
-  '/api/auth/register', '/api/auth/check-status',
+  '/api/auth/register', '/api/auth/check-status', '/api/auth/me',
   '/api/images/', '/api/admin/'];
 
 function getSecret() {
@@ -29,6 +30,10 @@ function authMiddleware(req, res, next) {
 
   try {
     const decoded = jwt.verify(header.slice(7), getSecret());
+    const user = db.prepare('SELECT id FROM users WHERE id = ?').get(decoded.userId);
+    if (!user) {
+      return res.status(401).json({ error: 'Account deleted. Please register again.' });
+    }
     req.user = decoded;
     next();
   } catch {

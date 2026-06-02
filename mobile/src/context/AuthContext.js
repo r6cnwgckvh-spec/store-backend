@@ -51,7 +51,16 @@ export function AuthProvider({ children }) {
         setUser(freshUser);
         setToken(storedToken);
         await storage.setUser(freshUser);
-      } catch {
+      } catch (e) {
+        if (e.message && (e.message.indexOf('Account deleted') !== -1 || e.message.indexOf('register again') !== -1)) {
+          await storage.clearAll();
+          setUser(null);
+          setToken(null);
+          setHasLocalPin(false);
+          clearTimeout(timeout);
+          setLoading(false);
+          return;
+        }
         if (storedUser && storedPinHash) {
           setUser(storedUser);
           setToken(storedToken);
