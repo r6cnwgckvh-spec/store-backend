@@ -1,6 +1,140 @@
 const express = require('express');
 const router = express.Router();
+const https = require('https');
 const db = require('../database');
+
+function getApiKey() {
+  if (process.env.GCP_API_KEY) return process.env.GCP_API_KEY;
+  const row = db.prepare('SELECT gcp_api_key FROM store_settings WHERE user_id = 1').get();
+  return row?.gcp_api_key || '';
+}
+
+function parseBillText(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  const items = [];
+  const skipWords = ['total', 'gst', 'tax', 'bill', 'invoice', 'store', 'shop', 'address',
+    'phone', 'date', 'cash', 'change', 'discount', 'sub total', 'subtotal', 'qty',
+    'rate', 'amount', 'hsn', 'sac', 'particulars', 'description', 'item', 'sl no',
+    's.no', 's. no', '#', 'name', 'price', 'cgst', 'sgst', 'igst', 'round',
+    'thank', 'welcome', 'mrp', 'batch', 'expiry', 'free', 'offer'];
+
+  for (const line of lines) {
+    const lower = line.toLowerCase().trim();
+
+    // Skip lines that are too short or are header/footer
+    if (lower.length < 6) continue;
+    const words = lower.split(/\s+/);
+    const skipRatio = words.filter(w => skipWords.some(s => w.includes(s))).length / words.length;
+    if (skipRatio > 0.4) continue;
+    if (/^\d+[\.\s]/.test(line)) continue; // line numbers
+    if (/^[0-9\s\-−–()\/]+$/.test(line.replace(/\s/g, ''))) continue; // only numbers/symbols
+
+    // Try to extract: name, quantity, amount/rate
+    // Pattern 1: Name  Qty  Rate  Amount  (e.g., "Paracetamol 500mg  10  5.00  50.00")
+    // Pattern 2: Name  Qty  Amount  (e.g., "Paracetamol 10  50.00")
+    // Pattern 3: Name  Amount  (e.g., "Paracetamol  50.00")
+
+    const numbers = line.match(/\d+\.?\d*/g) || [];
+    if (numbers.length < 1) continue;
+
+    // Find price-like numbers (decimal or large)
+    const prices = numbers.filter(n => n.includes('.') || parseFloat(n) > 10);
+    const qtyCandidates = numbers.filter(n => !n.includes('.') && parseFloat(n) <= 999);
+
+    let name = line;
+    let quantity = 1;
+    let rate = 0;
+    let amount = 0;
+
+    if (prices.length >= 2) {
+      // Name  Qty  Rate  Amount
+      rate = parseFloat(prices[0]);
+      amount = parseFloat(prices[1]);
+      const lastPriceIdx = line.lastIndexOf(prices[1]);
+      const secondLastPriceIdx = line.lastIndexOf(prices[0], lastPriceIdx - 1);
+      name = line.substring(0, Math.min(secondLastPriceIdx, lastPriceIdx)).trim();
+      if (qtyCandidates.length > 0) {
+        const qtyStr = qtyCandidates[qtyCandidates.length - 1];
+        const qtyIdx = line.indexOf(qtyStr);
+        if (qtyIdx > 0 && qtyIdx < Math.min(secondLastPriceIdx, lastPriceIdx)) {
+          quantity = parseInt(qtyStr);
+        }
+      }
+    } else if (prices.length === 1) {
+      // Name  Amount  (with optional qty)
+      amount = parseFloat(prices[0]);
+      const priceIdx = line.lastIndexOf(prices[0]);
+      name = line.substring(0, priceIdx).trim();
+      if (qtyCandidates.length > 0) {
+        const qtyStr = qtyCandidates[qtyCandidates.length - 1];
+        const qtyIdx = line.indexOf(qtyStr);
+        if (qtyIdx > 0 && qtyIdx < priceIdx) {
+          quantity = parseInt(qtyStr);
+        }
+      }
+    }
+
+    name = name.replace(/[×xX*]\s*\d+/g, '').replace(/@\s*\d+\.?\d*/g, '').trim();
+    name = name.replace(/[^a-zA-Z0-9\s\.\-\/]/g, '').trim();
+    name = name.replace(/\s+/g, ' ');
+
+    if (name.length < 3) continue;
+    if (skipWords.some(w => name.toLowerCase().includes(w))) continue;
+    if (items.some(i => i.name.toLowerCase() === name.toLowerCase())) continue;
+
+    items.push({
+      name,
+      quantity: Math.max(1, quantity),
+      cost_price: 0,
+      selling_price: Math.max(0, amount / Math.max(1, quantity)),
+      amount: Math.max(0, amount),
+    });
+  }
+
+  return items.slice(0, 100);
+}
+
+router.post('/ocr', (req, res) => {
+  const { image } = req.body;
+  if (!image) return res.status(400).json({ error: 'Image data is required' });
+
+  const apiKey = getApiKey();
+  if (!apiKey) return res.status(400).json({ error: 'Google Cloud Vision API key not configured. Set GCP_API_KEY in Settings or environment.' });
+
+  const requestBody = JSON.stringify({
+    requests: [{
+      image: { content: image },
+      features: [{ type: 'TEXT_DETECTION', maxResults: 1 }],
+    }],
+  });
+
+  const options = {
+    hostname: 'vision.googleapis.com',
+    path: `/v1/images:annotate?key=${apiKey}`,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  };
+
+  const apiReq = https.request(options, (apiRes) => {
+    let data = '';
+    apiRes.on('data', (chunk) => data += chunk);
+    apiRes.on('end', () => {
+      try {
+        const result = JSON.parse(data);
+        if (result.error) return res.status(400).json({ error: result.error.message });
+        const text = result.responses?.[0]?.fullTextAnnotation?.text || '';
+        const items = parseBillText(text);
+        res.json({ text, items, count: items.length });
+      } catch (e) {
+        res.status(500).json({ error: 'Failed to parse OCR result' });
+      }
+    });
+  });
+
+  apiReq.on('error', (e) => res.status(500).json({ error: e.message }));
+  apiReq.write(requestBody);
+  apiReq.end();
+});
 
 router.post('/', (req, res) => {
   const { items, notes, image_data } = req.body;

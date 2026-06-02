@@ -185,6 +185,7 @@ addColumnIfMissing('customers', 'user_id', 'INTEGER DEFAULT 1');
 addColumnIfMissing('orders', 'user_id', 'INTEGER DEFAULT 1');
 addColumnIfMissing('categories', 'user_id', 'INTEGER DEFAULT 1');
 addColumnIfMissing('purchases', 'user_id', 'INTEGER DEFAULT 1');
+addColumnIfMissing('store_settings', 'gcp_api_key', "TEXT DEFAULT ''");
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS categories (

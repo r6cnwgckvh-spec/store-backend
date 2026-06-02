@@ -3,6 +3,7 @@ import { View, Text, Image, StyleSheet, TextInput, TouchableOpacity, ScrollView,
 import * as ImagePicker from 'expo-image-picker';
 import { api } from '../api';
 import { useTheme } from '../context/ThemeContext';
+import { getImageUrl } from '../utils/helpers';
 
 // Field MUST be outside the component — defining it inside causes re-render on every keystroke
 const Field = ({ label, value, onChange, placeholder, keyboardType, multiline, styles }) => (
@@ -96,7 +97,7 @@ export default function AddProductScreen({ route, navigation }) {
 
         <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
           {image ? (
-            <Image source={{ uri: `data:image/jpeg;base64,${image}` }} style={styles.productImage} />
+            <Image source={{ uri: image.startsWith('/api/') ? getImageUrl(image) : `data:image/jpeg;base64,${image}` }} style={styles.productImage} />
           ) : (
             <Text style={styles.imagePickerText}>📷 Add Photo</Text>
           )}
