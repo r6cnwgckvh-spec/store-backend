@@ -18,10 +18,10 @@ function hashPin(pin) {
 }
 
 function getSecret() {
-  const row = db.prepare('SELECT jwt_secret FROM store_settings WHERE id = 1').get();
+  const row = db.prepare('SELECT jwt_secret FROM store_settings WHERE user_id = 1').get();
   if (row?.jwt_secret) return row.jwt_secret;
   const secret = crypto.randomBytes(32).toString('hex');
-  db.prepare('UPDATE store_settings SET jwt_secret = ? WHERE id = 1').run(secret);
+  db.prepare('UPDATE store_settings SET jwt_secret = ? WHERE user_id = 1').run(secret);
   return secret;
 }
 
@@ -36,7 +36,7 @@ function sanitizeUser(user) {
 
 router.get('/status', (req, res) => {
   const count = db.prepare('SELECT COUNT(*) as count FROM users').get().count;
-  const legacy = db.prepare('SELECT auth_pin FROM store_settings WHERE id = 1').get();
+  const legacy = db.prepare('SELECT auth_pin FROM store_settings WHERE user_id = 1').get();
   res.json({ hasPin: count > 0 || !!(legacy?.auth_pin) });
 });
 
@@ -90,7 +90,7 @@ router.post('/login', authLimiter, (req, res) => {
   }
 
   // Legacy single-user auth (backward compat)
-  const row = db.prepare('SELECT auth_pin FROM store_settings WHERE id = 1').get();
+  const row = db.prepare('SELECT auth_pin FROM store_settings WHERE user_id = 1').get();
   if (row?.auth_pin) {
     if (hashPin(pin) === row.auth_pin) {
       const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get().count;

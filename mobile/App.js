@@ -13,6 +13,8 @@ import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import PendingScreen from './src/screens/PendingScreen';
 import SetPinScreen from './src/screens/SetPinScreen';
+import LockScreen from './src/screens/LockScreen';
+import StoreSetupScreen from './src/screens/StoreSetupScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import ProductsScreen from './src/screens/ProductsScreen';
 import AddProductScreen from './src/screens/AddProductScreen';
@@ -27,6 +29,8 @@ import CustomerFormScreen from './src/screens/CustomerFormScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import ReportsScreen from './src/screens/ReportsScreen';
 import CategoriesScreen from './src/screens/CategoriesScreen';
+import ShoppingListsScreen from './src/screens/ShoppingListsScreen';
+import ShoppingListDetailScreen from './src/screens/ShoppingListDetailScreen';
 import Sidebar from './src/components/Sidebar';
 
 const Tab = createBottomTabNavigator();
@@ -104,7 +108,7 @@ function MainTabs() {
 }
 
 function AppContent() {
-  const { token, loading, user } = useAuth();
+  const { token, loading, user, isLocked, unlock, needsSetup, completeSetup } = useAuth();
   const { isDark } = useTheme();
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const navigationRef = useRef(null);
@@ -131,6 +135,12 @@ function AppContent() {
     if (user.status === 'approved' && !user.has_pin) {
       return <SetPinScreen />;
     }
+    if (isLocked) {
+      return <LockScreen onUnlock={unlock} />;
+    }
+    if (needsSetup) {
+      return <StoreSetupScreen onComplete={completeSetup} />;
+    }
     return (
       <SidebarContext.Provider value={{
         sidebarVisible,
@@ -145,6 +155,8 @@ function AppContent() {
             <Stack.Screen name="Settings" component={SettingsScreen} />
             <Stack.Screen name="Reports" component={ReportsScreen} />
             <Stack.Screen name="Categories" component={CategoriesScreen} />
+            <Stack.Screen name="ShoppingLists" component={ShoppingListsScreen} />
+            <Stack.Screen name="ShoppingListDetail" component={ShoppingListDetailScreen} />
           </Stack.Navigator>
         </NavigationContainer>
         <Sidebar

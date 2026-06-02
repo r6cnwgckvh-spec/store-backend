@@ -71,16 +71,18 @@ db.exec(`
   );
 
   CREATE TABLE IF NOT EXISTS store_settings (
-    id INTEGER PRIMARY KEY CHECK (id = 1),
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL DEFAULT 1,
     store_name TEXT DEFAULT 'Your Store Name',
     address TEXT DEFAULT '123 Main Street, City',
     phone TEXT DEFAULT '+91 98765 43210',
     email TEXT DEFAULT '',
-    tax_id TEXT DEFAULT ''
+    tax_id TEXT DEFAULT '',
+    currency_symbol TEXT DEFAULT '\u20B9',
+    currency_code TEXT DEFAULT 'INR',
+    auth_pin TEXT DEFAULT '',
+    jwt_secret TEXT DEFAULT ''
   );
-
-  INSERT OR IGNORE INTO store_settings (id, store_name, address, phone, email, tax_id)
-  VALUES (1, 'Your Store Name', '123 Main Street, City', '+91 98765 43210', '', '');
 
   CREATE TABLE IF NOT EXISTS purchases (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -143,10 +145,35 @@ addColumnIfMissing('products', 'expiry_date', "TEXT DEFAULT ''");
 addColumnIfMissing('products', 'image_url', "TEXT DEFAULT ''");
 addColumnIfMissing('products', 'tablets_per_strip', 'INTEGER DEFAULT 1');
 
-addColumnIfMissing('store_settings', 'currency_symbol', "TEXT DEFAULT '\u20B9'");
-addColumnIfMissing('store_settings', 'currency_code', "TEXT DEFAULT 'INR'");
 addColumnIfMissing('store_settings', 'auth_pin', "TEXT DEFAULT ''");
 addColumnIfMissing('store_settings', 'jwt_secret', "TEXT DEFAULT ''");
+
+// Migration: rebuild store_settings for per-user if old CHECK constraint exists
+try {
+  const oldDef = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='store_settings'").get();
+  if (oldDef && oldDef.sql.includes('CHECK')) {
+    db.exec(`
+      CREATE TABLE store_settings_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL DEFAULT 1,
+        store_name TEXT DEFAULT 'Your Store Name',
+        address TEXT DEFAULT '123 Main Street, City',
+        phone TEXT DEFAULT '+91 98765 43210',
+        email TEXT DEFAULT '',
+        tax_id TEXT DEFAULT '',
+        currency_symbol TEXT DEFAULT '\u20B9',
+        currency_code TEXT DEFAULT 'INR'
+      );
+      INSERT INTO store_settings_new (store_name, address, phone, email, tax_id, currency_symbol, currency_code, user_id)
+        SELECT store_name, address, phone, email, tax_id, COALESCE(currency_symbol,'\u20B9'), COALESCE(currency_code,'INR'), 1 FROM store_settings;
+      DROP TABLE store_settings;
+      ALTER TABLE store_settings_new RENAME TO store_settings;
+    `);
+    console.log('Migration: store_settings rebuilt for per-user');
+  }
+} catch (e) {
+  console.log('Migration note:', e.message);
+}
 
 addColumnIfMissing('products', 'user_id', 'INTEGER DEFAULT 1');
 addColumnIfMissing('customers', 'user_id', 'INTEGER DEFAULT 1');
@@ -166,6 +193,26 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     image_data TEXT NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS shopping_lists (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS shopping_list_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    list_id INTEGER NOT NULL,
+    product_id INTEGER DEFAULT NULL,
+    item_name TEXT NOT NULL,
+    quantity TEXT NOT NULL DEFAULT '1',
+    purchased INTEGER NOT NULL DEFAULT 0,
+    category TEXT DEFAULT '',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (list_id) REFERENCES shopping_lists(id) ON DELETE CASCADE
   );
 `);
 

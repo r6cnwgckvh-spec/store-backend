@@ -10,12 +10,27 @@ export function AuthProvider({ children }) {
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
   const [hasLocalPin, setHasLocalPin] = useState(false);
+  const [locked, setLocked] = useState(false);
+  const [needsSetup, setNeedsSetup] = useState(false);
+
+  const isLocked = !!(token && hasLocalPin && locked);
+
+  const unlock = useCallback(() => {
+    setLocked(false);
+  }, []);
+
+  const completeSetup = useCallback(async () => {
+    await storage.setSetupDone(true);
+    setNeedsSetup(false);
+  }, []);
 
   const logout = useCallback(async () => {
     await storage.clearAll();
     setUser(null);
     setToken(null);
     setHasLocalPin(false);
+    setLocked(false);
+    setNeedsSetup(false);
   }, []);
 
   const checkStoredAuth = useCallback(async () => {
@@ -40,6 +55,13 @@ export function AuthProvider({ children }) {
           setToken(storedToken);
         }
       }
+
+      if (storedPinHash) {
+        setLocked(true);
+      }
+
+      const setupDone = await storage.isSetupDone();
+      setNeedsSetup(!setupDone);
     } catch (e) {
       console.warn('checkStoredAuth error:', e);
     }
@@ -80,6 +102,9 @@ export function AuthProvider({ children }) {
     setToken(data.token);
     setUser(data.user);
     setHasLocalPin(true);
+    setLocked(true);
+    const setupDone = await storage.isSetupDone();
+    setNeedsSetup(!setupDone);
     return data;
   };
 
@@ -92,6 +117,9 @@ export function AuthProvider({ children }) {
     setToken(data.token);
     setUser(data.user);
     setHasLocalPin(true);
+    setLocked(true);
+    const setupDone = await storage.isSetupDone();
+    setNeedsSetup(!setupDone);
     return data;
   };
 
@@ -107,6 +135,9 @@ export function AuthProvider({ children }) {
 
     setToken(storedToken);
     setUser(storedUser);
+    setLocked(true);
+    const setupDone = await storage.isSetupDone();
+    setNeedsSetup(!setupDone);
     return storedUser;
   };
 
@@ -121,8 +152,9 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider value={{
-      user, token, loading, hasLocalPin,
+      user, token, loading, hasLocalPin, locked, isLocked, needsSetup,
       login, loginWithPin, register, checkStatus, setPin, changePin, logout,
+      unlock, completeSetup,
     }}>
       {children}
     </AuthContext.Provider>

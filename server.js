@@ -21,6 +21,8 @@ const backupRouter = require('./routes/backup');
 const authRouter = require('./routes/auth');
 const imagesRouter = require('./routes/images');
 const adminRouter = require('./routes/admin');
+const adminDataRouter = require('./routes/admin-data');
+const shoppingListsRouter = require('./routes/shopping-lists');
 const authMiddleware = require('./middleware/auth');
 
 app.use(helmet({ crossOriginResourcePolicy: false, contentSecurityPolicy: false }));
@@ -42,6 +44,7 @@ app.use('/admin', express.static(path.join(__dirname, 'admin')));
 app.use('/api/auth', authRouter);
 app.use('/api/images', imagesRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/admin', adminDataRouter);
 
 app.use(authMiddleware);
 
@@ -53,6 +56,7 @@ app.use('/api/reports', reportsRouter);
 app.use('/api/purchases', purchasesRouter);
 app.use('/api/categories', categoriesRouter);
 app.use('/api/backup', backupRouter);
+app.use('/api/shopping-lists', shoppingListsRouter);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });

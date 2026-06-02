@@ -6,7 +6,7 @@ const publicRoutes = ['/api/health', '/api/auth/login', '/api/auth/status',
   '/api/images/', '/api/admin/'];
 
 function getSecret() {
-  const row = db.prepare('SELECT jwt_secret FROM store_settings WHERE id = 1').get();
+  const row = db.prepare('SELECT jwt_secret FROM store_settings WHERE user_id = 1').get();
   return row?.jwt_secret || 'fallback-dev-secret';
 }
 
