@@ -102,7 +102,7 @@ tr.clickable:hover td { background: rgba(233,69,96,0.08); }
         <label>PIN</label>
         <input type="password" id="login-pin" placeholder="Enter your PIN" autocomplete="current-password">
       </div>
-      <button class="btn-primary" onclick="handleLogin()">Login</button>
+      <button class="btn-primary" data-action="login">Login</button>
       <div id="login-error" class="error"></div>
     </div>
   </div>
@@ -113,14 +113,14 @@ tr.clickable:hover td { background: rgba(233,69,96,0.08); }
         <h1>Admin Panel</h1>
         <div class="user-info" id="user-info"></div>
       </div>
-      <button class="logout-btn" onclick="handleLogout()">Logout</button>
+      <button class="logout-btn" data-action="logout">Logout</button>
     </div>
 
-    <div class="tabs">
-      <div class="tab active" onclick="switchTab('pending',this)" data-tab="pending">Pending</div>
-      <div class="tab" onclick="switchTab('approved',this)" data-tab="approved">Approved</div>
-      <div class="tab" onclick="switchTab('rejected',this)" data-tab="rejected">Rejected</div>
-      <div class="tab" onclick="switchTab('all',this)" data-tab="all">All</div>
+    <div class="tabs" id="user-tabs">
+      <div class="tab active" data-action="switch-tab" data-tab="pending">Pending</div>
+      <div class="tab" data-action="switch-tab" data-tab="approved">Approved</div>
+      <div class="tab" data-action="switch-tab" data-tab="rejected">Rejected</div>
+      <div class="tab" data-action="switch-tab" data-tab="all">All</div>
     </div>
 
     <div class="card">
@@ -149,14 +149,14 @@ tr.clickable:hover td { background: rgba(233,69,96,0.08); }
             <h2 id="detail-user-name"></h2>
             <div class="subtitle" id="detail-user-email"></div>
           </div>
-          <button class="btn-sm btn-secondary" onclick="closeDetail()">Close</button>
+          <button class="btn-sm btn-secondary" data-action="close-detail">Close</button>
         </div>
         <div class="tabs" id="detail-tabs">
-          <div class="tab active" onclick="switchDetailTab('products',this)">Products</div>
-          <div class="tab" onclick="switchDetailTab('orders',this)">Orders</div>
-          <div class="tab" onclick="switchDetailTab('customers',this)">Customers</div>
-          <div class="tab" onclick="switchDetailTab('stats',this)">Stats</div>
-          <div class="tab" onclick="switchDetailTab('edit',this)">Edit User</div>
+          <div class="tab active" data-action="detail-tab" data-tab="products">Products</div>
+          <div class="tab" data-action="detail-tab" data-tab="orders">Orders</div>
+          <div class="tab" data-action="detail-tab" data-tab="customers">Customers</div>
+          <div class="tab" data-action="detail-tab" data-tab="stats">Stats</div>
+          <div class="tab" data-action="detail-tab" data-tab="edit">Edit User</div>
         </div>
         <div id="detail-content">
           <div class="loading"><div class="spinner"></div><p>Loading...</p></div>
@@ -171,34 +171,37 @@ tr.clickable:hover td { background: rgba(233,69,96,0.08); }
 </div>
 
 <script>
+(function(){
 const API = window.location.origin + '/api';
 let token = localStorage.getItem('admin_token');
 let currentTab = 'pending';
 let selectedUserId = null;
 let selectedDetailTab = 'products';
 
+const $ = id => document.getElementById(id);
+
 async function apiFetch(path, options = {}) {
   const headers = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  const res = await fetch(`${API}${path}`, { ...options, headers: { ...headers, ...options.headers } });
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  const res = await fetch(API + path, { ...options, headers: { ...headers, ...options.headers } });
   if (res.status === 401) { localStorage.removeItem('admin_token'); token = null; showLogin(); throw new Error('Session expired'); }
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  if (!res.ok) throw new Error(data.error || 'HTTP ' + res.status);
   return data;
 }
 
-function showLogin() { document.getElementById('login-view').style.display = 'block'; document.getElementById('dashboard-view').style.display = 'none'; }
-function showDashboard() { document.getElementById('login-view').style.display = 'none'; document.getElementById('dashboard-view').style.display = 'block'; }
+function showLogin() { $('login-view').style.display = 'block'; $('dashboard-view').style.display = 'none'; }
+function showDashboard() { $('login-view').style.display = 'none'; $('dashboard-view').style.display = 'block'; }
 
 async function handleLogin() {
-  const email = document.getElementById('login-email').value.trim();
-  const pin = document.getElementById('login-pin').value;
-  const errEl = document.getElementById('login-error');
+  const email = $('login-email').value.trim();
+  const pin = $('login-pin').value;
+  const errEl = $('login-error');
   errEl.textContent = '';
   if (!email || !pin) { errEl.textContent = 'Please enter email and PIN'; return; }
   try {
     const data = await apiFetch('/auth/login', { method: 'POST', body: JSON.stringify({ email, pin }) });
-    if (data.user?.role !== 'admin') { errEl.textContent = 'Only admins can access this panel'; return; }
+    if (data.user && data.user.role !== 'admin') { errEl.textContent = 'Only admins can access this panel'; return; }
     token = data.token;
     localStorage.setItem('admin_token', token);
     initDashboard(data.user);
@@ -214,87 +217,91 @@ function handleLogout() {
 
 function switchTab(tab, el) {
   currentTab = tab;
-  document.querySelectorAll('.tabs:first-of-type .tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('active'));
   el.classList.add('active');
   closeDetail();
   loadUsers();
 }
 
 async function initDashboard(user) {
-  document.getElementById('user-info').textContent = `Logged in as ${user.name} (${user.email})`;
+  $('user-info').textContent = 'Logged in as ' + user.name + ' (' + user.email + ')';
   showDashboard();
   await loadUsers();
 }
 
+function esc(s) {
+  var d = document.createElement('div');
+  d.textContent = String(s);
+  return d.innerHTML;
+}
+
 async function loadUsers() {
-  const tbody = document.getElementById('users-tbody');
-  const empty = document.getElementById('users-empty');
-  const loading = document.getElementById('users-loading');
+  const tbody = $('users-tbody');
+  const empty = $('users-empty');
+  const loading = $('users-loading');
   loading.style.display = 'block';
   tbody.innerHTML = '';
   empty.style.display = 'none';
   try {
-    const params = currentTab !== 'all' ? `?status=${currentTab}` : '';
-    const users = await apiFetch(`/admin/users${params}`);
+    const params = currentTab !== 'all' ? '?status=' + currentTab : '';
+    const users = await apiFetch('/admin/users' + params);
     loading.style.display = 'none';
     if (!users.length) { empty.style.display = 'block'; return; }
-    tbody.innerHTML = users.map(u => {
-      const statusClass = `badge-${u.status}`;
-      const isPending = u.status === 'pending';
-      const isAdmin = u.role === 'admin';
-      const date = new Date(u.created_at).toLocaleDateString();
-      const isSelected = selectedUserId === u.id;
-      const nameEnc = encodeURIComponent(u.name);
-      const emailEnc = encodeURIComponent(u.email);
-      return `<tr class="clickable" onclick="selectUser(${u.id},'${nameEnc}','${emailEnc}')" style="${isSelected ? 'background:rgba(233,69,96,0.12);' : ''}">
-        <td>${u.id}</td>
-        <td><strong>${esc(u.name)}</strong></td>
-        <td>${esc(u.email)}</td>
-        <td><span class="badge ${statusClass}">${u.status}</span></td>
-        <td>${isAdmin ? '<span style="color:#e94560">Admin</span>' : 'User'}</td>
-        <td style="color:#666;font-size:12px">${date}</td>
-        <td class="actions">
-          <button class="btn-sm btn-secondary" onclick="event.stopPropagation();selectUser(${u.id},'${nameEnc}','${emailEnc}')">View</button>
-          ${isPending ? `<button class="btn-xs btn-success" onclick="event.stopPropagation();approveUser(${u.id})">Approve</button>
-          <button class="btn-xs btn-danger" onclick="event.stopPropagation();rejectUser(${u.id})">Reject</button>` : ''}
-          ${!isAdmin ? `<button class="btn-xs btn-danger" onclick="event.stopPropagation();deleteUser(${u.id},'${nameEnc}')">Delete</button>` : ''}
-        </td>
-      </tr>`;
+    tbody.innerHTML = users.map(function(u){
+      var sc = 'badge-' + u.status;
+      var ip = u.status === 'pending';
+      var ia = u.role === 'admin';
+      var d = new Date(u.created_at).toLocaleDateString();
+      var sel = selectedUserId === u.id ? 'background:rgba(233,69,96,0.12);' : '';
+      return '<tr data-id="' + u.id + '" data-name="' + esc(u.name) + '" data-email="' + esc(u.email) + '" style="' + sel + '">' +
+        '<td>' + u.id + '</td>' +
+        '<td><strong>' + esc(u.name) + '</strong></td>' +
+        '<td>' + esc(u.email) + '</td>' +
+        '<td><span class="badge ' + sc + '">' + u.status + '</span></td>' +
+        '<td>' + (ia ? '<span style="color:#e94560">Admin</span>' : 'User') + '</td>' +
+        '<td style="color:#666;font-size:12px">' + d + '</td>' +
+        '<td class="actions">' +
+          '<button class="btn-sm btn-secondary" data-action="view">View</button>' +
+          (ip ? '<button class="btn-xs btn-success" data-action="approve">Approve</button><button class="btn-xs btn-danger" data-action="reject">Reject</button>' : '') +
+          (!ia ? '<button class="btn-xs btn-danger" data-action="delete">Delete</button>' : '') +
+        '</td></tr>';
     }).join('');
   } catch (e) {
     loading.style.display = 'none';
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#e74c3c;padding:20px;">Error: ${e.message}</td></tr>`;
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#e74c3c;padding:20px;">Error: ' + esc(e.message) + '</td></tr>';
   }
 }
 
 function selectUser(id, name, email) {
   selectedUserId = id;
-  document.getElementById('detail-user-name').textContent = decodeURIComponent(name);
-  document.getElementById('detail-user-email').textContent = `ID: ${id} | Email: ${decodeURIComponent(email)}`;
-  document.getElementById('user-detail').style.display = 'block';
+  $('detail-user-name').textContent = name;
+  $('detail-user-email').textContent = 'ID: ' + id + ' | Email: ' + email;
+  $('user-detail').style.display = 'block';
   selectedDetailTab = 'products';
-  document.querySelectorAll('#detail-tabs .tab').forEach(t => t.classList.remove('active'));
-  document.querySelector('#detail-tabs .tab').classList.add('active');
+  var tabs = document.querySelectorAll('#detail-tabs .tab');
+  for (var i = 0; i < tabs.length; i++) tabs[i].classList.remove('active');
+  tabs[0].classList.add('active');
   loadDetailTab('products');
   loadUsers();
 }
 
 function closeDetail() {
   selectedUserId = null;
-  document.getElementById('user-detail').style.display = 'none';
+  $('user-detail').style.display = 'none';
   loadUsers();
 }
 
 function switchDetailTab(tab, el) {
   selectedDetailTab = tab;
-  document.querySelectorAll('#detail-tabs .tab').forEach(t => t.classList.remove('active'));
+  var tabs = document.querySelectorAll('#detail-tabs .tab');
+  for (var i = 0; i < tabs.length; i++) tabs[i].classList.remove('active');
   el.classList.add('active');
   loadDetailTab(tab);
 }
 
 async function loadDetailTab(tab) {
   if (!selectedUserId) return;
-  const container = document.getElementById('detail-content');
+  var container = $('detail-content');
   container.innerHTML = '<div class="loading"><div class="spinner"></div><p>Loading...</p></div>';
   try {
     if (tab === 'products') await loadDetailProducts(container);
@@ -303,114 +310,105 @@ async function loadDetailTab(tab) {
     else if (tab === 'stats') await loadDetailStats(container);
     else if (tab === 'edit') await loadDetailEdit(container);
   } catch (e) {
-    container.innerHTML = `<div class="empty" style="color:#e74c3c;">Error: ${e.message}</div>`;
+    container.innerHTML = '<div class="empty" style="color:#e74c3c;">Error: ' + esc(e.message) + '</div>';
   }
 }
 
 async function loadDetailProducts(container) {
-  const products = await apiFetch(`/admin/users/${selectedUserId}/products`);
+  var products = await apiFetch('/admin/users/' + selectedUserId + '/products');
   if (!products.length) {
     container.innerHTML = '<div class="empty">No products for this user</div>';
     return;
   }
-  container.innerHTML = `<table>
-    <thead><tr><th>Name</th><th>Barcode</th><th>Price</th><th>Stock</th><th>Cost</th><th>Actions</th></tr></thead>
-    <tbody>${products.map(p => `<tr>
-      <td><strong>${esc(p.name)}</strong></td>
-      <td style="color:#888;font-size:13px;">${esc(p.barcode)}</td>
-      <td>${p.price.toFixed(2)}</td>
-      <td>${p.stock}</td>
-      <td>${p.cost_price ? p.cost_price.toFixed(2) : '-'}</td>
-      <td class="actions">
-        <button class="btn-xs btn-warning" onclick="editProduct(${p.id})">Edit</button>
-        <button class="btn-xs btn-danger" onclick="confirmDeleteProduct(${p.id})">Delete</button>
-      </td>
-    </tr>`).join('')}</tbody>
-  </table>`;
-  
   window.__detailProducts = products;
+  container.innerHTML = '<table><thead><tr><th>Name</th><th>Barcode</th><th>Price</th><th>Stock</th><th>Cost</th><th>Actions</th></tr></thead><tbody>' +
+    products.map(function(p){
+      return '<tr>' +
+        '<td><strong>' + esc(p.name) + '</strong></td>' +
+        '<td style="color:#888;font-size:13px;">' + esc(p.barcode) + '</td>' +
+        '<td>' + Number(p.price).toFixed(2) + '</td>' +
+        '<td>' + p.stock + '</td>' +
+        '<td>' + (p.cost_price ? Number(p.cost_price).toFixed(2) : '-') + '</td>' +
+        '<td class="actions"><button class="btn-xs btn-warning" data-action="edit-prod" data-pid="' + p.id + '">Edit</button><button class="btn-xs btn-danger" data-action="del-prod" data-pid="' + p.id + '">Delete</button></td></tr>';
+    }).join('') + '</tbody></table>';
 }
 
 async function loadDetailOrders(container) {
-  const orders = await apiFetch(`/admin/users/${selectedUserId}/orders`);
+  var orders = await apiFetch('/admin/users/' + selectedUserId + '/orders');
   if (!orders.length) {
     container.innerHTML = '<div class="empty">No orders for this user</div>';
     return;
   }
-  container.innerHTML = `<table>
-    <thead><tr><th>ID</th><th>Customer</th><th>Total</th><th>Items</th><th>Date</th><th>Actions</th></tr></thead>
-    <tbody>${orders.map(o => `<tr>
-      <td>#${o.id}</td>
-      <td>${esc(o.customer_name) || '-'}</td>
-      <td><strong>${o.total_amount.toFixed(2)}</strong></td>
-      <td>${o.items_count || 0}</td>
-      <td style="color:#888;font-size:13px;">${new Date(o.created_at).toLocaleDateString()}</td>
-      <td><button class="btn-xs btn-danger" onclick="confirmDeleteOrder(${o.id})">Delete</button></td>
-    </tr>`).join('')}</tbody>
-  </table>`;
+  container.innerHTML = '<table><thead><tr><th>ID</th><th>Customer</th><th>Total</th><th>Items</th><th>Date</th><th>Actions</th></tr></thead><tbody>' +
+    orders.map(function(o){
+      return '<tr>' +
+        '<td>#' + o.id + '</td>' +
+        '<td>' + esc(o.customer_name || '-') + '</td>' +
+        '<td><strong>' + Number(o.total_amount).toFixed(2) + '</strong></td>' +
+        '<td>' + (o.items_count || 0) + '</td>' +
+        '<td style="color:#888;font-size:13px;">' + new Date(o.created_at).toLocaleDateString() + '</td>' +
+        '<td><button class="btn-xs btn-danger" data-action="del-order" data-oid="' + o.id + '">Delete</button></td></tr>';
+    }).join('') + '</tbody></table>';
 }
 
 async function loadDetailCustomers(container) {
-  const customers = await apiFetch(`/admin/users/${selectedUserId}/customers`);
+  var customers = await apiFetch('/admin/users/' + selectedUserId + '/customers');
   if (!customers.length) {
     container.innerHTML = '<div class="empty">No customers for this user</div>';
     return;
   }
-  container.innerHTML = `<table>
-    <thead><tr><th>Name</th><th>Phone</th><th>Email</th><th>Actions</th></tr></thead>
-    <tbody>${customers.map(c => `<tr>
-      <td><strong>${esc(c.name)}</strong></td>
-      <td>${esc(c.phone) || '-'}</td>
-      <td>${esc(c.email) || '-'}</td>
-      <td><button class="btn-xs btn-danger" onclick="confirmDeleteCustomer(${c.id},'${encodeURIComponent(c.name)}')">Delete</button></td>
-    </tr>`).join('')}</tbody>
-  </table>`;
+  container.innerHTML = '<table><thead><tr><th>Name</th><th>Phone</th><th>Email</th><th>Actions</th></tr></thead><tbody>' +
+    customers.map(function(c){
+      return '<tr>' +
+        '<td><strong>' + esc(c.name) + '</strong></td>' +
+        '<td>' + esc(c.phone || '-') + '</td>' +
+        '<td>' + esc(c.email || '-') + '</td>' +
+        '<td><button class="btn-xs btn-danger" data-action="del-cust" data-cid="' + c.id + '" data-cname="' + esc(c.name) + '">Delete</button></td></tr>';
+    }).join('') + '</tbody></table>';
 }
 
 async function loadDetailStats(container) {
-  const stats = await apiFetch(`/admin/users/${selectedUserId}/stats`);
-  container.innerHTML = `<div class="stat-grid">
-    <div class="stat-card"><div class="stat-value">${stats.productCount}</div><div class="stat-label">Products</div></div>
-    <div class="stat-card"><div class="stat-value">${stats.orderCount}</div><div class="stat-label">Orders</div></div>
-    <div class="stat-card"><div class="stat-value">${stats.customerCount}</div><div class="stat-label">Customers</div></div>
-    <div class="stat-card"><div class="stat-value">${Number(stats.totalRevenue).toFixed(2)}</div><div class="stat-label">Total Revenue</div></div>
-  </div>`;
+  var stats = await apiFetch('/admin/users/' + selectedUserId + '/stats');
+  container.innerHTML = '<div class="stat-grid">' +
+    '<div class="stat-card"><div class="stat-value">' + stats.productCount + '</div><div class="stat-label">Products</div></div>' +
+    '<div class="stat-card"><div class="stat-value">' + stats.orderCount + '</div><div class="stat-label">Orders</div></div>' +
+    '<div class="stat-card"><div class="stat-value">' + stats.customerCount + '</div><div class="stat-label">Customers</div></div>' +
+    '<div class="stat-card"><div class="stat-value">' + Number(stats.totalRevenue).toFixed(2) + '</div><div class="stat-label">Total Revenue</div></div>' +
+  '</div>';
 }
 
 async function loadDetailEdit(container) {
-  const users = await apiFetch('/admin/users?status=all');
-  const user = users.find(u => u.id === selectedUserId);
+  var users = await apiFetch('/admin/users?status=all');
+  var user = null;
+  for (var i = 0; i < users.length; i++) { if (users[i].id === selectedUserId) { user = users[i]; break; } }
   if (!user) { container.innerHTML = '<div class="empty">User not found</div>'; return; }
-  container.innerHTML = `
-    <div class="form-group"><label>Name</label><input type="text" id="edit-user-name" value="${esc(user.name)}"></div>
-    <div class="form-group"><label>Email</label><input type="email" id="edit-user-email" value="${esc(user.email)}"></div>
-    <div class="form-group"><label>Status</label>
-      <select id="edit-user-status">
-        <option value="pending" ${user.status === 'pending' ? 'selected' : ''}>Pending</option>
-        <option value="approved" ${user.status === 'approved' ? 'selected' : ''}>Approved</option>
-        <option value="rejected" ${user.status === 'rejected' ? 'selected' : ''}>Rejected</option>
-      </select>
-    </div>
-    <div style="display:flex;gap:10px;margin-top:16px;">
-      <button class="btn-sm btn-success" onclick="saveUserEdit()">Save Changes</button>
-      <button class="btn-sm btn-secondary" onclick="loadDetailTab('stats')">Cancel</button>
-    </div>
-    <div id="edit-user-msg" class="success" style="margin-top:10px;"></div>
-  `;
+  container.innerHTML = '<div class="form-group"><label>Name</label><input type="text" id="edit-user-name" value="' + esc(user.name) + '"></div>' +
+    '<div class="form-group"><label>Email</label><input type="email" id="edit-user-email" value="' + esc(user.email) + '"></div>' +
+    '<div class="form-group"><label>Status</label>' +
+    '<select id="edit-user-status">' +
+    '  <option value="pending"' + (user.status === 'pending' ? ' selected' : '') + '>Pending</option>' +
+    '  <option value="approved"' + (user.status === 'approved' ? ' selected' : '') + '>Approved</option>' +
+    '  <option value="rejected"' + (user.status === 'rejected' ? ' selected' : '') + '>Rejected</option>' +
+    '</select></div>' +
+    '<div style="display:flex;gap:10px;margin-top:16px;">' +
+    '<button class="btn-sm btn-success" data-action="save-user-edit">Save Changes</button>' +
+    '<button class="btn-sm btn-secondary" data-action="cancel-edit">Cancel</button>' +
+    '</div>' +
+    '<div id="edit-user-msg" class="success" style="margin-top:10px;"></div>';
 }
 
 async function saveUserEdit() {
-  const name = document.getElementById('edit-user-name').value.trim();
-  const email = document.getElementById('edit-user-email').value.trim();
-  const status = document.getElementById('edit-user-status').value;
-  const msg = document.getElementById('edit-user-msg');
+  var name = $('edit-user-name').value.trim();
+  var email = $('edit-user-email').value.trim();
+  var status = $('edit-user-status').value;
+  var msg = $('edit-user-msg');
   try {
-    const result = await apiFetch(`/admin/users/${selectedUserId}`, {
+    var result = await apiFetch('/admin/users/' + selectedUserId, {
       method: 'PUT',
-      body: JSON.stringify({ name, email, status })
+      body: JSON.stringify({ name: name, email: email, status: status })
     });
     msg.textContent = 'User updated successfully';
-    const nameEl = document.getElementById('detail-user-name');
+    var nameEl = $('detail-user-name');
     if (nameEl) nameEl.textContent = result.name;
   } catch (e) {
     msg.style.color = '#e74c3c';
@@ -418,159 +416,224 @@ async function saveUserEdit() {
   }
 }
 
-function editProduct(productId) {
-  const products = window.__detailProducts || [];
-  const product = products.find(p => p.id === productId);
-  if (!product) return;
-  const inner = document.getElementById('modal-inner');
-  inner.innerHTML = `
-    <h2>Edit Product</h2>
-    <div class="form-group"><label>Name</label><input type="text" id="edit-prod-name" value="${esc(product.name)}"></div>
-    <div class="form-group"><label>Barcode</label><input type="text" id="edit-prod-barcode" value="${esc(product.barcode)}"></div>
-    <div class="form-group"><label>Price</label><input type="number" step="0.01" id="edit-prod-price" value="${product.price}"></div>
-    <div class="form-group"><label>Stock</label><input type="number" id="edit-prod-stock" value="${product.stock}"></div>
-    <div class="form-group"><label>Cost Price</label><input type="number" step="0.01" id="edit-prod-cost" value="${product.cost_price || ''}"></div>
-    <div id="edit-prod-msg" class="error"></div>
-    <div class="modal-actions">
-      <button class="btn-sm btn-secondary" onclick="closeModal()">Cancel</button>
-      <button class="btn-sm btn-success" onclick="saveProduct(${productId})">Save</button>
-    </div>
-  `;
-  document.getElementById('modal-overlay').style.display = 'flex';
-}
-
-async function saveProduct(productId) {
-  const name = document.getElementById('edit-prod-name').value.trim();
-  const barcode = document.getElementById('edit-prod-barcode').value.trim();
-  const price = parseFloat(document.getElementById('edit-prod-price').value);
-  const stock = parseInt(document.getElementById('edit-prod-stock').value);
-  const cost_price = parseFloat(document.getElementById('edit-prod-cost').value) || 0;
-  const msg = document.getElementById('edit-prod-msg');
-  if (!name) { msg.textContent = 'Name is required'; return; }
-  if (!barcode) { msg.textContent = 'Barcode is required'; return; }
-  if (isNaN(price) || price < 0) { msg.textContent = 'Valid price required'; return; }
-  if (isNaN(stock) || stock < 0) { msg.textContent = 'Valid stock required'; return; }
-  try {
-    await apiFetch(`/admin/users/${selectedUserId}/products/${productId}`, {
-      method: 'PUT',
-      body: JSON.stringify({ name, barcode, price, stock, cost_price })
-    });
-    closeModal();
-    loadDetailTab('products');
-  } catch (e) {
-    msg.textContent = e.message;
-  }
-}
-
-function confirmDeleteProduct(productId) {
-  const products = window.__detailProducts || [];
-  const product = products.find(p => p.id === productId);
-  const name = product ? product.name : 'this product';
-  const inner = document.getElementById('modal-inner');
-  inner.innerHTML = `
-    <h2>Delete Product</h2>
-    <p style="color:#ccc;margin-bottom:16px;">Are you sure you want to delete <strong>${esc(name)}</strong>?</p>
-    <div id="delete-prod-msg" class="error"></div>
-    <div class="modal-actions">
-      <button class="btn-sm btn-secondary" onclick="closeModal()">Cancel</button>
-      <button class="btn-sm btn-danger" onclick="deleteProduct(${productId})">Delete</button>
-    </div>
-  `;
-  document.getElementById('modal-overlay').style.display = 'flex';
-}
-
-async function deleteProduct(productId) {
-  try {
-    await apiFetch(`/admin/users/${selectedUserId}/products/${productId}`, { method: 'DELETE' });
-    closeModal();
-    loadDetailTab('products');
-  } catch (e) {
-    document.getElementById('delete-prod-msg').textContent = e.message;
-  }
-}
-
-function confirmDeleteOrder(orderId) {
-  const inner = document.getElementById('modal-inner');
-  inner.innerHTML = `
-    <h2>Delete Order</h2>
-    <p style="color:#ccc;margin-bottom:16px;">Are you sure you want to delete order #${orderId}? Stock will be restored.</p>
-    <div id="delete-order-msg" class="error"></div>
-    <div class="modal-actions">
-      <button class="btn-sm btn-secondary" onclick="closeModal()">Cancel</button>
-      <button class="btn-sm btn-danger" onclick="deleteOrder(${orderId})">Delete</button>
-    </div>
-  `;
-  document.getElementById('modal-overlay').style.display = 'flex';
-}
-
-async function deleteOrder(orderId) {
-  try {
-    await apiFetch(`/admin/users/${selectedUserId}/orders/${orderId}`, { method: 'DELETE' });
-    closeModal();
-    loadDetailTab('orders');
-  } catch (e) {
-    document.getElementById('delete-order-msg').textContent = e.message;
-  }
-}
-
-function confirmDeleteCustomer(customerId, name) {
-  name = decodeURIComponent(name);
-  const inner = document.getElementById('modal-inner');
-  inner.innerHTML = `
-    <h2>Delete Customer</h2>
-    <p style="color:#ccc;margin-bottom:16px;">Are you sure you want to delete customer <strong>${esc(name)}</strong>?</p>
-    <div id="delete-cust-msg" class="error"></div>
-    <div class="modal-actions">
-      <button class="btn-sm btn-secondary" onclick="closeModal()">Cancel</button>
-      <button class="btn-sm btn-danger" onclick="deleteCustomer(${customerId})">Delete</button>
-    </div>
-  `;
-  document.getElementById('modal-overlay').style.display = 'flex';
-}
-
-async function deleteCustomer(customerId) {
-  try {
-    await apiFetch(`/admin/users/${selectedUserId}/customers/${customerId}`, { method: 'DELETE' });
-    closeModal();
-    loadDetailTab('customers');
-  } catch (e) {
-    document.getElementById('delete-cust-msg').textContent = e.message;
-  }
+function openModal(html) {
+  $('modal-inner').innerHTML = html;
+  $('modal-overlay').style.display = 'flex';
 }
 
 function closeModal() {
-  document.getElementById('modal-overlay').style.display = 'none';
+  $('modal-overlay').style.display = 'none';
 }
 
-async function approveUser(id) {
-  try { await apiFetch(`/admin/users/${id}/approve`, { method: 'POST' }); await loadUsers(); }
-  catch (e) { alert('Error: ' + e.message); }
-}
-
-async function rejectUser(id) {
-  try { await apiFetch(`/admin/users/${id}/reject`, { method: 'POST' }); await loadUsers(); }
-  catch (e) { alert('Error: ' + e.message); }
-}
-
-async function deleteUser(id, name) {
-  name = decodeURIComponent(name);
-  if (!confirm(`Delete user "${name}"? This cannot be undone.`)) return;
-  try { await apiFetch(`/admin/users/${id}`, { method: 'DELETE' }); if (selectedUserId === id) closeDetail(); await loadUsers(); }
-  catch (e) { alert('Error: ' + e.message); }
-}
-
-function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
-
-(async function() {
-  if (token) {
-    try {
-      const user = await apiFetch('/auth/me');
-      if (user.role === 'admin') { initDashboard(user); return; }
-    } catch {}
-    localStorage.removeItem('admin_token');
-    token = null;
+// Event delegation for all clicks
+document.addEventListener('click', function(e) {
+  var el = e.target;
+  var action = el.getAttribute('data-action');
+  if (!action) {
+    // Check if clicked on a tr with data-id (user row click)
+    var row = el.closest ? el.closest('tr[data-id]') : null;
+    if (row) {
+      var id = parseInt(row.getAttribute('data-id'));
+      var name = row.getAttribute('data-name');
+      var email = row.getAttribute('data-email');
+      selectUser(id, name, email);
+      return;
+    }
+    return;
   }
-  showLogin();
+
+  // Users table actions
+  var row = el.closest ? el.closest('tr[data-id]') : null;
+  var uid = row ? parseInt(row.getAttribute('data-id')) : null;
+
+  if (action === 'view' && uid) {
+    var name = row.getAttribute('data-name');
+    var email = row.getAttribute('data-email');
+    selectUser(uid, name, email);
+    return;
+  }
+  if (action === 'approve' && uid) {
+    apiFetch('/admin/users/' + uid + '/approve', { method: 'POST' }).then(loadUsers).catch(function(e){ alert('Error: ' + e.message); });
+    return;
+  }
+  if (action === 'reject' && uid) {
+    apiFetch('/admin/users/' + uid + '/reject', { method: 'POST' }).then(loadUsers).catch(function(e){ alert('Error: ' + e.message); });
+    return;
+  }
+  if (action === 'delete' && uid) {
+    var name = row.getAttribute('data-name');
+    if (!confirm('Delete user "' + name + '"? This cannot be undone.')) return;
+    apiFetch('/admin/users/' + uid, { method: 'DELETE' }).then(function(){
+      if (selectedUserId === uid) closeDetail();
+      loadUsers();
+    }).catch(function(e){ alert('Error: ' + e.message); });
+    return;
+  }
+
+  // Detail tab actions
+  if (action === 'edit-prod') {
+    var pid = parseInt(el.getAttribute('data-pid'));
+    var products = window.__detailProducts || [];
+    var product = null;
+    for (var i = 0; i < products.length; i++) { if (products[i].id === pid) { product = products[i]; break; } }
+    if (!product) return;
+    openModal(
+      '<h2>Edit Product</h2>' +
+      '<div class="form-group"><label>Name</label><input type="text" id="edit-prod-name" value="' + esc(product.name) + '"></div>' +
+      '<div class="form-group"><label>Barcode</label><input type="text" id="edit-prod-barcode" value="' + esc(product.barcode) + '"></div>' +
+      '<div class="form-group"><label>Price</label><input type="number" step="0.01" id="edit-prod-price" value="' + product.price + '"></div>' +
+      '<div class="form-group"><label>Stock</label><input type="number" id="edit-prod-stock" value="' + product.stock + '"></div>' +
+      '<div class="form-group"><label>Cost Price</label><input type="number" step="0.01" id="edit-prod-cost" value="' + (product.cost_price || '') + '"></div>' +
+      '<div id="edit-prod-msg" class="error"></div>' +
+      '<div class="modal-actions">' +
+      '<button class="btn-sm btn-secondary" data-action="close-modal">Cancel</button>' +
+      '<button class="btn-sm btn-success" data-action="save-prod" data-pid="' + pid + '">Save</button></div>'
+    );
+    return;
+  }
+
+  if (action === 'save-prod') {
+    var pid = parseInt(el.getAttribute('data-pid'));
+    var name = $('edit-prod-name').value.trim();
+    var barcode = $('edit-prod-barcode').value.trim();
+    var price = parseFloat($('edit-prod-price').value);
+    var stock = parseInt($('edit-prod-stock').value);
+    var cost_price = parseFloat($('edit-prod-cost').value) || 0;
+    var msg = $('edit-prod-msg');
+    if (!name) { msg.textContent = 'Name is required'; return; }
+    if (!barcode) { msg.textContent = 'Barcode is required'; return; }
+    if (isNaN(price) || price < 0) { msg.textContent = 'Valid price required'; return; }
+    if (isNaN(stock) || stock < 0) { msg.textContent = 'Valid stock required'; return; }
+    apiFetch('/admin/users/' + selectedUserId + '/products/' + pid, {
+      method: 'PUT',
+      body: JSON.stringify({ name: name, barcode: barcode, price: price, stock: stock, cost_price: cost_price })
+    }).then(function(){
+      closeModal();
+      loadDetailTab('products');
+    }).catch(function(e){ msg.textContent = e.message; });
+    return;
+  }
+
+  if (action === 'del-prod') {
+    var pid = parseInt(el.getAttribute('data-pid'));
+    var products = window.__detailProducts || [];
+    var pname = 'this product';
+    for (var i = 0; i < products.length; i++) { if (products[i].id === pid) { pname = products[i].name; break; } }
+    openModal(
+      '<h2>Delete Product</h2>' +
+      '<p style="color:#ccc;margin-bottom:16px;">Are you sure you want to delete <strong>' + esc(pname) + '</strong>?</p>' +
+      '<div id="delete-prod-msg" class="error"></div>' +
+      '<div class="modal-actions">' +
+      '<button class="btn-sm btn-secondary" data-action="close-modal">Cancel</button>' +
+      '<button class="btn-sm btn-danger" data-action="confirm-del-prod" data-pid="' + pid + '">Delete</button></div>'
+    );
+    return;
+  }
+
+  if (action === 'confirm-del-prod') {
+    var pid = parseInt(el.getAttribute('data-pid'));
+    apiFetch('/admin/users/' + selectedUserId + '/products/' + pid, { method: 'DELETE' }).then(function(){
+      closeModal();
+      loadDetailTab('products');
+    }).catch(function(e){ $('delete-prod-msg').textContent = e.message; });
+    return;
+  }
+
+  if (action === 'del-order') {
+    var oid = parseInt(el.getAttribute('data-oid'));
+    openModal(
+      '<h2>Delete Order</h2>' +
+      '<p style="color:#ccc;margin-bottom:16px;">Are you sure you want to delete order #' + oid + '? Stock will be restored.</p>' +
+      '<div id="delete-order-msg" class="error"></div>' +
+      '<div class="modal-actions">' +
+      '<button class="btn-sm btn-secondary" data-action="close-modal">Cancel</button>' +
+      '<button class="btn-sm btn-danger" data-action="confirm-del-order" data-oid="' + oid + '">Delete</button></div>'
+    );
+    return;
+  }
+
+  if (action === 'confirm-del-order') {
+    var oid = parseInt(el.getAttribute('data-oid'));
+    apiFetch('/admin/users/' + selectedUserId + '/orders/' + oid, { method: 'DELETE' }).then(function(){
+      closeModal();
+      loadDetailTab('orders');
+    }).catch(function(e){ $('delete-order-msg').textContent = e.message; });
+    return;
+  }
+
+  if (action === 'del-cust') {
+    var cid = parseInt(el.getAttribute('data-cid'));
+    var cname = el.getAttribute('data-cname');
+    openModal(
+      '<h2>Delete Customer</h2>' +
+      '<p style="color:#ccc;margin-bottom:16px;">Are you sure you want to delete customer <strong>' + esc(cname) + '</strong>?</p>' +
+      '<div id="delete-cust-msg" class="error"></div>' +
+      '<div class="modal-actions">' +
+      '<button class="btn-sm btn-secondary" data-action="close-modal">Cancel</button>' +
+      '<button class="btn-sm btn-danger" data-action="confirm-del-cust" data-cid="' + cid + '">Delete</button></div>'
+    );
+    return;
+  }
+
+  if (action === 'confirm-del-cust') {
+    var cid = parseInt(el.getAttribute('data-cid'));
+    apiFetch('/admin/users/' + selectedUserId + '/customers/' + cid, { method: 'DELETE' }).then(function(){
+      closeModal();
+      loadDetailTab('customers');
+    }).catch(function(e){ $('delete-cust-msg').textContent = e.message; });
+    return;
+  }
+
+  if (action === 'save-user-edit') { saveUserEdit(); return; }
+  if (action === 'cancel-edit') { loadDetailTab('stats'); return; }
+  if (action === 'close-modal') { closeModal(); return; }
+
+  // Global actions
+  if (action === 'login') { handleLogin(); return; }
+  if (action === 'logout') { handleLogout(); return; }
+  if (action === 'close-detail') { closeDetail(); return; }
+
+  if (action === 'switch-tab') {
+    var tab = el.getAttribute('data-tab');
+    if (tab) {
+      currentTab = tab;
+      var tabs = document.querySelectorAll('#user-tabs .tab');
+      for (var i = 0; i < tabs.length; i++) tabs[i].classList.remove('active');
+      el.classList.add('active');
+      closeDetail();
+      loadUsers();
+    }
+    return;
+  }
+
+  if (action === 'detail-tab') {
+    var tab = el.getAttribute('data-tab');
+    if (tab) {
+      selectedDetailTab = tab;
+      var tabs = document.querySelectorAll('#detail-tabs .tab');
+      for (var i = 0; i < tabs.length; i++) tabs[i].classList.remove('active');
+      el.classList.add('active');
+      loadDetailTab(tab);
+    }
+    return;
+  }
+});
+
+(function init() {
+  if (token) {
+    apiFetch('/auth/me').then(function(user){
+      if (user.role === 'admin') { initDashboard(user); return; }
+      throw new Error('Not admin');
+    }).catch(function(){
+      localStorage.removeItem('admin_token');
+      token = null;
+      showLogin();
+    });
+  } else {
+    showLogin();
+  }
+})();
+
 })();
 </script>
 </body>

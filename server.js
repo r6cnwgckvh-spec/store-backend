@@ -58,14 +58,10 @@ const backupLimiter = rateLimit({
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
-app.use((req, res, next) => {
-  if (['POST', 'PUT', 'PATCH'].includes(req.method) && req.headers['content-type'] !== 'application/json' && !req.path.startsWith('/admin')) {
-    return res.status(415).json({ error: 'Content-Type must be application/json' });
-  }
-  next();
-});
+
 
 app.use('/admin', express.static(path.join(__dirname, 'admin')));
+app.get('/favicon.ico', (req, res) => res.status(204).end());
 
 app.use('/api/auth', authLimiter, authRouter);
 app.use('/api/images', imagesRouter);
