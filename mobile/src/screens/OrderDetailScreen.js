@@ -6,6 +6,7 @@ import { formatCurrency, formatDate } from '../utils/helpers';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
+import { useTheme } from '../context/ThemeContext';
 
 let cachedSettings = null;
 
@@ -16,6 +17,8 @@ async function getSettings() {
 }
 
 export default function OrderDetailScreen({ route, navigation }) {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const [order, setOrder] = useState(route.params?.order || null);
   const [loading, setLoading] = useState(!order);
 
@@ -124,14 +127,14 @@ export default function OrderDetailScreen({ route, navigation }) {
   if (!order) return null;
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#f5f5f5' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={styles.topBar}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.topBtn}>
           <Text style={styles.topBtnText}>← Back</Text>
         </TouchableOpacity>
         <Text style={styles.topTitle}>Order #{order.id}</Text>
         <TouchableOpacity onPress={handleDelete} style={styles.topBtn}>
-          <Text style={[styles.topBtnText, { color: '#dc3545' }]}>Delete</Text>
+          <Text style={[styles.topBtnText, { color: colors.danger }]}>Delete</Text>
         </TouchableOpacity>
       </View>
       <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
@@ -158,8 +161,8 @@ export default function OrderDetailScreen({ route, navigation }) {
         ))}
 
         <View style={styles.totalSection}>
-          <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>Total</Text>
-          <Text style={{ color: '#fff', fontSize: 22, fontWeight: 'bold' }}>{formatCurrency(order.total_amount)}</Text>
+          <Text style={{ color: colors.headerText, fontSize: 16, fontWeight: '600' }}>Total</Text>
+          <Text style={{ color: colors.headerText, fontSize: 22, fontWeight: 'bold' }}>{formatCurrency(order.total_amount)}</Text>
         </View>
 
         <TouchableOpacity style={styles.pdfBtn} onPress={generatePdf}>
@@ -180,30 +183,30 @@ export default function OrderDetailScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5', padding: 16 },
+const getStyles = (colors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background, padding: 16 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#f5f5f5' },
+  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: colors.background },
   topBtn: { paddingVertical: 4, paddingHorizontal: 8 },
-  topBtnText: { fontSize: 16, color: '#007bff', fontWeight: '600' },
-  topTitle: { fontSize: 18, fontWeight: '700', color: '#1a1a2e' },
+  topBtnText: { fontSize: 16, color: colors.primary, fontWeight: '600' },
+  topTitle: { fontSize: 18, fontWeight: '700', color: colors.text },
   billHeader: { alignItems: 'center', marginBottom: 20, marginTop: 8 },
-  billTitle: { fontSize: 22, fontWeight: 'bold', color: '#1a1a2e' },
-  date: { fontSize: 13, color: '#999', marginTop: 4 },
-  section: { backgroundColor: '#fff', borderRadius: 10, padding: 14, marginBottom: 16, elevation: 1 },
-  secLabel: { fontSize: 11, color: '#999', textTransform: 'uppercase', marginBottom: 4 },
-  custName: { fontSize: 16, fontWeight: '600', color: '#333' },
-  custPhone: { fontSize: 13, color: '#666', marginTop: 2 },
-  heading: { fontSize: 16, fontWeight: '700', color: '#1a1a2e', marginBottom: 10 },
-  itemRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 10, padding: 14, marginBottom: 6, elevation: 1 },
-  itemName: { fontSize: 14, fontWeight: '600', color: '#333' },
-  itemSub: { fontSize: 12, color: '#666', marginTop: 2 },
-  itemTotal: { fontSize: 16, fontWeight: '700', color: '#28a745' },
-  totalSection: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#1a1a2e', borderRadius: 12, padding: 18, marginTop: 12 },
-  pdfBtn: { backgroundColor: '#007bff', borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 20, elevation: 3 },
-  pdfBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  billTitle: { fontSize: 22, fontWeight: 'bold', color: colors.text },
+  date: { fontSize: 13, color: colors.textLight, marginTop: 4 },
+  section: { backgroundColor: colors.card, borderRadius: 10, padding: 14, marginBottom: 16, elevation: 1 },
+  secLabel: { fontSize: 11, color: colors.textLight, textTransform: 'uppercase', marginBottom: 4 },
+  custName: { fontSize: 16, fontWeight: '600', color: colors.textSecondary },
+  custPhone: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
+  heading: { fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 10 },
+  itemRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.card, borderRadius: 10, padding: 14, marginBottom: 6, elevation: 1 },
+  itemName: { fontSize: 14, fontWeight: '600', color: colors.textSecondary },
+  itemSub: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  itemTotal: { fontSize: 16, fontWeight: '700', color: colors.success },
+  totalSection: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.headerBg, borderRadius: 12, padding: 18, marginTop: 12 },
+  pdfBtn: { backgroundColor: colors.primary, borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 20, elevation: 3 },
+  pdfBtnText: { color: colors.headerText, fontSize: 16, fontWeight: '700' },
   smsBtn: { backgroundColor: '#25D366', borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 12, elevation: 3 },
-  smsBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  delBtn: { backgroundColor: '#fff', borderRadius: 12, padding: 14, alignItems: 'center', marginTop: 10, borderWidth: 1, borderColor: '#dc3545' },
-  delBtnText: { color: '#dc3545', fontSize: 15, fontWeight: '700' },
+  smsBtnText: { color: colors.headerText, fontSize: 16, fontWeight: '700' },
+  delBtn: { backgroundColor: colors.card, borderRadius: 12, padding: 14, alignItems: 'center', marginTop: 10, borderWidth: 1, borderColor: colors.danger },
+  delBtnText: { color: colors.danger, fontSize: 15, fontWeight: '700' },
 });

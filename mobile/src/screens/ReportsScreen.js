@@ -5,6 +5,7 @@ import { api } from '../api';
 import { formatCurrency, formatDate } from '../utils/helpers';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import { useTheme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
@@ -16,6 +17,8 @@ const periods = [
 ];
 
 export default function ReportsScreen({ navigation }) {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const [period, setPeriod] = useState('month');
   const [sales, setSales] = useState(null);
   const [stockVal, setStockVal] = useState(null);
@@ -102,16 +105,16 @@ export default function ReportsScreen({ navigation }) {
         </View>
 
         <View style={styles.statsRow}>
-          <View style={[styles.statCard, { borderLeftColor: '#28a745' }]}>
-            <Text style={[styles.statValue, { color: '#28a745' }]}>{s.order_count || 0}</Text>
+          <View style={[styles.statCard, { borderLeftColor: colors.success }]}>
+            <Text style={[styles.statValue, { color: colors.success }]}>{s.order_count || 0}</Text>
             <Text style={styles.statLabel}>Orders</Text>
           </View>
-          <View style={[styles.statCard, { borderLeftColor: '#007bff' }]}>
-            <Text style={[styles.statValue, { color: '#007bff', fontSize: 18 }]}>{formatCurrency(s.total_revenue || 0)}</Text>
+          <View style={[styles.statCard, { borderLeftColor: colors.primary }]}>
+            <Text style={[styles.statValue, { color: colors.primary, fontSize: 18 }]}>{formatCurrency(s.total_revenue || 0)}</Text>
             <Text style={styles.statLabel}>Revenue</Text>
           </View>
-          <View style={[styles.statCard, { borderLeftColor: '#ffc107' }]}>
-            <Text style={[styles.statValue, { color: '#ffc107', fontSize: 18 }]}>{formatCurrency(s.total_discount || 0)}</Text>
+          <View style={[styles.statCard, { borderLeftColor: colors.warning }]}>
+            <Text style={[styles.statValue, { color: colors.warning, fontSize: 18 }]}>{formatCurrency(s.total_discount || 0)}</Text>
             <Text style={styles.statLabel}>Discounts</Text>
           </View>
         </View>
@@ -186,27 +189,27 @@ export default function ReportsScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#f5f5f5' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e0e0e0' },
-  backBtn: { fontSize: 16, color: '#007bff', fontWeight: '600' },
-  title: { fontSize: 18, fontWeight: '700', color: '#1a1a2e' },
-  printBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: '#007bff' },
-  printBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+const getStyles = (colors) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: colors.background },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, backgroundColor: colors.card, borderBottomWidth: 1, borderBottomColor: colors.border },
+  backBtn: { fontSize: 16, color: colors.primary, fontWeight: '600' },
+  title: { fontSize: 18, fontWeight: '700', color: colors.text },
+  printBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: colors.primary },
+  printBtnText: { color: colors.card, fontSize: 12, fontWeight: '700' },
   content: { padding: 16 },
   periodRow: { flexDirection: 'row', marginBottom: 16, gap: 8 },
-  periodBtn: { flex: 1, paddingVertical: 10, borderRadius: 8, backgroundColor: '#fff', alignItems: 'center', elevation: 1 },
-  periodActive: { backgroundColor: '#007bff' },
-  periodText: { fontSize: 12, fontWeight: '600', color: '#333' },
-  periodTextActive: { color: '#fff' },
+  periodBtn: { flex: 1, paddingVertical: 10, borderRadius: 8, backgroundColor: colors.card, alignItems: 'center', elevation: 1 },
+  periodActive: { backgroundColor: colors.primary },
+  periodText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
+  periodTextActive: { color: colors.card },
   statsRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  statCard: { flex: 1, backgroundColor: '#fff', borderRadius: 10, padding: 12, borderLeftWidth: 4, elevation: 2 },
+  statCard: { flex: 1, backgroundColor: colors.card, borderRadius: 10, padding: 12, borderLeftWidth: 4, elevation: 2 },
   statValue: { fontSize: 22, fontWeight: '700' },
-  statLabel: { fontSize: 10, color: '#666', marginTop: 4 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: '#1a1a2e', marginBottom: 10, marginTop: 8 },
-  listItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff', borderRadius: 10, padding: 14, marginBottom: 8, elevation: 1 },
-  itemName: { fontSize: 14, fontWeight: '600', color: '#333' },
-  itemSub: { fontSize: 11, color: '#999', marginTop: 2 },
-  itemPrice: { fontSize: 14, fontWeight: '700', color: '#28a745' },
+  statLabel: { fontSize: 10, color: colors.textMuted, marginTop: 4 },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 10, marginTop: 8 },
+  listItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.card, borderRadius: 10, padding: 14, marginBottom: 8, elevation: 1 },
+  itemName: { fontSize: 14, fontWeight: '600', color: colors.textSecondary },
+  itemSub: { fontSize: 11, color: colors.textLight, marginTop: 2 },
+  itemPrice: { fontSize: 14, fontWeight: '700', color: colors.success },
   itemProfit: { fontSize: 11, color: '#e83e8c', marginTop: 2 },
 });

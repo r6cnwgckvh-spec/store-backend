@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, Linking } from 'react-native';
-
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTheme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 const SIDEBAR_WIDTH = width * 0.75;
@@ -19,7 +19,34 @@ const menuItems = [
   { icon: '👑', label: 'Admin Panel', screen: 'AdminPanel' },
 ];
 
+const getStyles = (colors) => StyleSheet.create({
+  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.overlay, zIndex: 999 },
+  sidebar: {
+    position: 'absolute', top: 0, left: 0, bottom: 0, width: SIDEBAR_WIDTH,
+    backgroundColor: colors.card, zIndex: 1000, elevation: 10, shadowColor: '#000',
+    shadowOffset: { width: 2, height: 0 }, shadowOpacity: 0.3, shadowRadius: 10,
+  },
+  header: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    padding: 16, backgroundColor: colors.headerBg,
+  },
+  headerTitle: { fontSize: 18, fontWeight: '700', color: colors.headerText },
+  closeBtn: { padding: 4 },
+  closeText: { fontSize: 20, color: colors.headerText },
+  menu: { flex: 1, padding: 8 },
+  menuItem: {
+    flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 8,
+  },
+  menuIcon: { fontSize: 20, marginRight: 14 },
+  menuLabel: { fontSize: 15, fontWeight: '600', color: colors.textSecondary },
+  footer: { padding: 16, borderTopWidth: 1, borderTopColor: colors.border, alignItems: 'center' },
+  watermark: { fontSize: 11, color: colors.textLight },
+  divider: { height: 1, backgroundColor: colors.border, marginVertical: 8 },
+});
+
 export default function Sidebar({ visible, onClose, navigationRef }) {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const slideAnim = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -85,28 +112,3 @@ export default function Sidebar({ visible, onClose, navigationRef }) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 999 },
-  sidebar: {
-    position: 'absolute', top: 0, left: 0, bottom: 0, width: SIDEBAR_WIDTH,
-    backgroundColor: '#fff', zIndex: 1000, elevation: 10, shadowColor: '#000',
-    shadowOffset: { width: 2, height: 0 }, shadowOpacity: 0.3, shadowRadius: 10,
-  },
-  header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    padding: 16, backgroundColor: '#1a1a2e',
-  },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: '#fff' },
-  closeBtn: { padding: 4 },
-  closeText: { fontSize: 20, color: '#fff' },
-  menu: { flex: 1, padding: 8 },
-  menuItem: {
-    flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 8,
-  },
-  menuIcon: { fontSize: 20, marginRight: 14 },
-  menuLabel: { fontSize: 15, fontWeight: '600', color: '#333' },
-  footer: { padding: 16, borderTopWidth: 1, borderTopColor: '#e0e0e0', alignItems: 'center' },
-  watermark: { fontSize: 11, color: '#999' },
-  divider: { height: 1, backgroundColor: '#e0e0e0', marginVertical: 8 },
-});

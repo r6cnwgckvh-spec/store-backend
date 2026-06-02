@@ -3,8 +3,11 @@ import { View, Text, StyleSheet, TouchableOpacity, RefreshControl, TextInput, Al
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { api } from '../api';
 import { formatCurrency, formatDate } from '../utils/helpers';
+import { useTheme } from '../context/ThemeContext';
 
 export default function OrderHistoryScreen({ navigation }) {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const [orders, setOrders] = useState([]);
   const [search, setSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -57,7 +60,7 @@ export default function OrderHistoryScreen({ navigation }) {
         <TextInput
           style={styles.search}
           placeholder="Search by customer, date, amount..."
-          placeholderTextColor="#999"
+          placeholderTextColor={colors.placeholder}
           value={search}
           onChangeText={setSearch}
         />
@@ -106,26 +109,26 @@ export default function OrderHistoryScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#f5f5f5' },
+const getStyles = (colors) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: colors.background },
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
-  title: { fontSize: 22, fontWeight: 'bold', color: '#1a1a2e' },
-  count: { fontSize: 13, color: '#999', fontWeight: '600' },
+  title: { fontSize: 22, fontWeight: 'bold', color: colors.text },
+  count: { fontSize: 13, color: colors.textLight, fontWeight: '600' },
   searchRow: { marginHorizontal: 16, marginBottom: 12, flexDirection: 'row', alignItems: 'center' },
-  search: { flex: 1, backgroundColor: '#fff', borderRadius: 10, padding: 12, fontSize: 15, borderWidth: 1, borderColor: '#e0e0e0' },
+  search: { flex: 1, backgroundColor: colors.card, borderRadius: 10, padding: 12, fontSize: 15, borderWidth: 1, borderColor: colors.border },
   clearBtn: { marginLeft: -40, padding: 8, zIndex: 1 },
-  clearText: { fontSize: 16, color: '#999', fontWeight: '600' },
+  clearText: { fontSize: 16, color: colors.textLight, fontWeight: '600' },
   list: { flex: 1 },
-  empty: { textAlign: 'center', color: '#999', fontSize: 14 },
-  card: { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 8, elevation: 2 },
+  empty: { textAlign: 'center', color: colors.textLight, fontSize: 14 },
+  card: { backgroundColor: colors.card, borderRadius: 12, padding: 14, marginBottom: 8, elevation: 2 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  orderId: { fontSize: 15, fontWeight: '700', color: '#1a1a2e' },
+  orderId: { fontSize: 15, fontWeight: '700', color: colors.text },
   delBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#ffe8e8', justifyContent: 'center', alignItems: 'center' },
-  delText: { fontSize: 12, color: '#dc3545', fontWeight: '700' },
+  delText: { fontSize: 12, color: colors.danger, fontWeight: '700' },
   cardBody: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  customer: { fontSize: 13, color: '#555' },
-  date: { fontSize: 11, color: '#999', marginTop: 2 },
+  customer: { fontSize: 13, color: colors.textMuted },
+  date: { fontSize: 11, color: colors.textLight, marginTop: 2 },
   cardFooter: { alignItems: 'flex-end' },
-  items: { fontSize: 11, color: '#999' },
-  amount: { fontSize: 16, fontWeight: '700', color: '#28a745', marginTop: 2 },
+  items: { fontSize: 11, color: colors.textLight },
+  amount: { fontSize: 16, fontWeight: '700', color: colors.success, marginTop: 2 },
 });

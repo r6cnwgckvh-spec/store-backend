@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { View, Text, Image, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { api } from '../api';
+import { useTheme } from '../context/ThemeContext';
 
 // Field MUST be outside the component — defining it inside causes re-render on every keystroke
-const Field = ({ label, value, onChange, placeholder, keyboardType, multiline }) => (
+const Field = ({ label, value, onChange, placeholder, keyboardType, multiline, styles }) => (
   <View style={{ marginBottom: 14 }}>
     <Text style={styles.label}>{label}</Text>
     <TextInput
@@ -19,6 +20,8 @@ const Field = ({ label, value, onChange, placeholder, keyboardType, multiline })
 );
 
 export default function AddProductScreen({ route, navigation }) {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const p = route.params?.product;
   const [isMedicine, setIsMedicine] = useState(p ? (p.tablets_per_strip || 1) > 1 : false);
   const [barcode, setBarcode] = useState(route.params?.barcode || (p ? p.barcode : ''));
@@ -108,19 +111,19 @@ export default function AddProductScreen({ route, navigation }) {
           </TouchableOpacity>
         </View>
 
-        <Field label="Barcode" value={barcode} onChange={setBarcode} placeholder="Scan or type" />
-        <Field label="Name *" value={name} onChange={setName} placeholder="Product name" />
+        <Field label="Barcode" value={barcode} onChange={setBarcode} placeholder="Scan or type" styles={styles} />
+        <Field label="Name *" value={name} onChange={setName} placeholder="Product name" styles={styles} />
         <View style={{ flexDirection: 'row', gap: 12 }}>
-          <View style={{ flex: 1 }}><Field label="Cost Price" value={costPrice} onChange={setCostPrice} placeholder="0.00" keyboardType="decimal-pad" /></View>
-          <View style={{ flex: 1 }}><Field label="Selling Price *" value={sellingPrice} onChange={setSellingPrice} placeholder="0.00" keyboardType="decimal-pad" /></View>
+          <View style={{ flex: 1 }}><Field label="Cost Price" value={costPrice} onChange={setCostPrice} placeholder="0.00" keyboardType="decimal-pad" styles={styles} /></View>
+          <View style={{ flex: 1 }}><Field label="Selling Price *" value={sellingPrice} onChange={setSellingPrice} placeholder="0.00" keyboardType="decimal-pad" styles={styles} /></View>
         </View>
         <View style={{ flexDirection: 'row', gap: 12 }}>
-          {isMedicine && <View style={{ flex: 1 }}><Field label="Tablets/Strip" value={tabletsPerStrip} onChange={setTabletsPerStrip} placeholder="10" keyboardType="number-pad" /></View>}
-          <View style={{ flex: isMedicine ? 1 : 1 }}><Field label={isMedicine ? "Stock (strips)" : "Stock"} value={stock} onChange={setStock} placeholder="0" keyboardType="number-pad" /></View>
+          {isMedicine && <View style={{ flex: 1 }}><Field label="Tablets/Strip" value={tabletsPerStrip} onChange={setTabletsPerStrip} placeholder="10" keyboardType="number-pad" styles={styles} /></View>}
+          <View style={{ flex: isMedicine ? 1 : 1 }}><Field label={isMedicine ? "Stock (strips)" : "Stock"} value={stock} onChange={setStock} placeholder="0" keyboardType="number-pad" styles={styles} /></View>
         </View>
-        <Field label="Category" value={category} onChange={setCategory} placeholder="e.g. Oil, Grain" />
-        <Field label="Size" value={size} onChange={setSize} placeholder="e.g. 1L, 500g" />
-        <Field label="Description" value={description} onChange={setDescription} placeholder="Optional" multiline />
+        <Field label="Category" value={category} onChange={setCategory} placeholder="e.g. Oil, Grain" styles={styles} />
+        <Field label="Size" value={size} onChange={setSize} placeholder="e.g. 1L, 500g" styles={styles} />
+        <Field label="Description" value={description} onChange={setDescription} placeholder="Optional" multiline styles={styles} />
 
         <TouchableOpacity style={[styles.submit, loading && { opacity: 0.6 }]} onPress={handleSubmit} disabled={loading}>
           <Text style={styles.submitText}>{loading ? 'Saving...' : p ? 'Update Product' : 'Add to Inventory'}</Text>
@@ -130,24 +133,24 @@ export default function AddProductScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
+const getStyles = (colors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  title: { fontSize: 22, fontWeight: 'bold', color: '#1a1a2e' },
-  cancelBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, backgroundColor: '#f0f0f0' },
-  cancelText: { fontSize: 14, fontWeight: '600', color: '#666' },
-  imagePicker: { width: 100, height: 100, borderRadius: 12, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', alignSelf: 'center', marginBottom: 16, borderWidth: 2, borderColor: '#e0e0e0', borderStyle: 'dashed', overflow: 'hidden' },
+  title: { fontSize: 22, fontWeight: 'bold', color: colors.text },
+  cancelBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, backgroundColor: colors.background },
+  cancelText: { fontSize: 14, fontWeight: '600', color: colors.textMuted },
+  imagePicker: { width: 100, height: 100, borderRadius: 12, backgroundColor: colors.card, justifyContent: 'center', alignItems: 'center', alignSelf: 'center', marginBottom: 16, borderWidth: 2, borderColor: colors.border, borderStyle: 'dashed', overflow: 'hidden' },
   productImage: { width: '100%', height: '100%', borderRadius: 12 },
-  imagePickerText: { fontSize: 13, color: '#999', fontWeight: '600' },
-  scanBtn: { backgroundColor: '#1a1a2e', borderRadius: 12, padding: 16, alignItems: 'center', marginBottom: 20, elevation: 3 },
-  scanBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  imagePickerText: { fontSize: 13, color: colors.textLight, fontWeight: '600' },
+  scanBtn: { backgroundColor: colors.headerBg, borderRadius: 12, padding: 16, alignItems: 'center', marginBottom: 20, elevation: 3 },
+  scanBtnText: { color: colors.headerText, fontSize: 16, fontWeight: '600' },
   typeToggle: { flexDirection: 'row', marginBottom: 16, gap: 8 },
-  typeBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: '#fff', alignItems: 'center', borderWidth: 1, borderColor: '#e0e0e0' },
-  typeActive: { backgroundColor: '#1a1a2e', borderColor: '#1a1a2e' },
-  typeBtnText: { fontSize: 14, fontWeight: '600', color: '#666' },
-  typeTextActive: { color: '#fff' },
-  label: { fontSize: 13, fontWeight: '600', color: '#555', marginBottom: 6, marginLeft: 2 },
-  input: { backgroundColor: '#fff', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, borderWidth: 1, borderColor: '#e0e0e0' },
-  submit: { backgroundColor: '#28a745', borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 10, elevation: 3 },
-  submitText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  typeBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: colors.card, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
+  typeActive: { backgroundColor: colors.headerBg, borderColor: colors.headerBg },
+  typeBtnText: { fontSize: 14, fontWeight: '600', color: colors.textMuted },
+  typeTextActive: { color: colors.headerText },
+  label: { fontSize: 13, fontWeight: '600', color: colors.textMuted, marginBottom: 6, marginLeft: 2 },
+  input: { backgroundColor: colors.inputBg, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, borderWidth: 1, borderColor: colors.border },
+  submit: { backgroundColor: colors.success, borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 10, elevation: 3 },
+  submitText: { color: colors.headerText, fontSize: 16, fontWeight: '700' },
 });

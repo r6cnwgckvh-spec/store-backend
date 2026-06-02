@@ -148,6 +148,12 @@ addColumnIfMissing('store_settings', 'currency_code', "TEXT DEFAULT 'INR'");
 addColumnIfMissing('store_settings', 'auth_pin', "TEXT DEFAULT ''");
 addColumnIfMissing('store_settings', 'jwt_secret', "TEXT DEFAULT ''");
 
+addColumnIfMissing('products', 'user_id', 'INTEGER DEFAULT 1');
+addColumnIfMissing('customers', 'user_id', 'INTEGER DEFAULT 1');
+addColumnIfMissing('orders', 'user_id', 'INTEGER DEFAULT 1');
+addColumnIfMissing('categories', 'user_id', 'INTEGER DEFAULT 1');
+addColumnIfMissing('purchases', 'user_id', 'INTEGER DEFAULT 1');
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS categories (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

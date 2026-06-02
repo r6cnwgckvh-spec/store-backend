@@ -13,6 +13,9 @@ router.get('/', (req, res) => {
   const params = [];
   const conditions = [];
 
+  conditions.push('user_id = ?');
+  params.push(req.user.userId);
+
   if (search) {
     conditions.push('(name LIKE ? OR barcode LIKE ?)');
     params.push(`%${search}%`, `%${search}%`);
@@ -22,7 +25,7 @@ router.get('/', (req, res) => {
     params.push(category);
   }
 
-  const where = conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : '';
+  const where = ' WHERE ' + conditions.join(' AND ');
 
   const { total } = db.prepare(countQuery + where).get(...params);
   const products = db.prepare(query + where + ' ORDER BY updated_at DESC LIMIT ? OFFSET ?').all(...params, limitNum, offset);
@@ -31,20 +34,20 @@ router.get('/', (req, res) => {
 
 router.get('/low-stock', (req, res) => {
   const threshold = parseInt(req.query.threshold) || 5;
-  const products = db.prepare('SELECT * FROM products WHERE stock <= ? ORDER BY stock ASC').all(threshold);
+  const products = db.prepare('SELECT * FROM products WHERE stock <= ? AND user_id = ? ORDER BY stock ASC').all(threshold, req.user.userId);
   res.json(products);
 });
 
 router.get('/:id', (req, res) => {
   const id = parseInt(req.params.id);
   if (isNaN(id) || id < 1) return res.status(400).json({ error: 'Invalid product ID' });
-  const product = db.prepare('SELECT * FROM products WHERE id = ?').get(id);
+  const product = db.prepare('SELECT * FROM products WHERE id = ? AND user_id = ?').get(id, req.user.userId);
   if (!product) return res.status(404).json({ error: 'Product not found' });
   res.json(product);
 });
 
 router.get('/barcode/:barcode', (req, res) => {
-  const product = db.prepare('SELECT * FROM products WHERE barcode = ?').get(req.params.barcode);
+  const product = db.prepare('SELECT * FROM products WHERE barcode = ? AND user_id = ?').get(req.params.barcode, req.user.userId);
   if (!product) return res.status(404).json({ error: 'Product not found' });
   res.json(product);
 });
@@ -59,7 +62,7 @@ router.post('/', (req, res) => {
   }
 
   try {
-    const existing = db.prepare('SELECT id FROM products WHERE barcode = ?').get(barcode.trim());
+    const existing = db.prepare('SELECT id FROM products WHERE barcode = ? AND user_id = ?').get(barcode.trim(), req.user.userId);
     if (existing) {
       return res.status(409).json({ error: 'Product with this barcode already exists', productId: existing.id });
     }
@@ -71,10 +74,10 @@ router.post('/', (req, res) => {
     const pTps = Math.max(1, parseInt(tablets_per_strip) || 1);
 
     const result = db.prepare(`
-      INSERT INTO products (barcode, name, price, stock, description, category, size, cost_price, min_stock, expiry_date, image_url, tablets_per_strip)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO products (barcode, name, price, stock, description, category, size, cost_price, min_stock, expiry_date, image_url, tablets_per_strip, user_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(barcode.trim(), name.trim(), pPrice, pStock, (description || '').trim(), category || '', size || '',
-      pCost, pMinStock, expiry_date || '', image_url || '', pTps);
+      pCost, pMinStock, expiry_date || '', image_url || '', pTps, req.user.userId);
 
     const product = db.prepare('SELECT * FROM products WHERE id = ?').get(result.lastInsertRowid);
     res.status(201).json(product);
@@ -92,7 +95,7 @@ router.put('/:id', (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id) || id < 1) return res.status(400).json({ error: 'Invalid product ID' });
 
-    const old = db.prepare('SELECT * FROM products WHERE id = ?').get(id);
+    const old = db.prepare('SELECT * FROM products WHERE id = ? AND user_id = ?').get(id, req.user.userId);
     if (!old) return res.status(404).json({ error: 'Product not found' });
 
     const pPrice = parseFloat(price);
@@ -110,11 +113,11 @@ router.put('/:id', (req, res) => {
     db.prepare(`
       UPDATE products SET name = ?, price = ?, stock = ?, description = ?, category = ?, size = ?,
         cost_price = ?, min_stock = ?, expiry_date = ?, image_url = ?, tablets_per_strip = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
+      WHERE id = ? AND user_id = ?
     `).run(name.trim(), pFinalPrice, pStock, (description || '').trim(), category || '', size || '',
-      pCost, pMinStock, expiry_date || '', image_url || '', pTps, id);
+      pCost, pMinStock, expiry_date || '', image_url || '', pTps, id, req.user.userId);
 
-    const product = db.prepare('SELECT * FROM products WHERE id = ?').get(req.params.id);
+    const product = db.prepare('SELECT * FROM products WHERE id = ? AND user_id = ?').get(req.params.id, req.user.userId);
     res.json(product);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -130,9 +133,9 @@ router.patch('/:id/stock', (req, res) => {
   }
   try {
     const pStock = parseInt(stock);
-    const result = db.prepare('UPDATE products SET stock = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(pStock, id);
+    const result = db.prepare('UPDATE products SET stock = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?').run(pStock, id, req.user.userId);
     if (result.changes === 0) return res.status(404).json({ error: 'Product not found' });
-    const product = db.prepare('SELECT * FROM products WHERE id = ?').get(id);
+    const product = db.prepare('SELECT * FROM products WHERE id = ? AND user_id = ?').get(id, req.user.userId);
     res.json(product);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -140,15 +143,15 @@ router.patch('/:id/stock', (req, res) => {
 });
 
 router.get('/low-stock-by-min', (req, res) => {
-  const products = db.prepare('SELECT * FROM products WHERE min_stock > 0 AND stock <= min_stock ORDER BY stock ASC').all();
+  const products = db.prepare('SELECT * FROM products WHERE min_stock > 0 AND stock <= min_stock AND user_id = ? ORDER BY stock ASC').all(req.user.userId);
   res.json(products);
 });
 
 router.get('/near-expiry', (req, res) => {
   const days = parseInt(req.query.days) || 30;
   const products = db.prepare(
-    "SELECT * FROM products WHERE expiry_date != '' AND expiry_date >= date('now') AND expiry_date <= date('now', ?)"
-  ).all(`+${days} days`);
+    "SELECT * FROM products WHERE expiry_date != '' AND expiry_date >= date('now') AND expiry_date <= date('now', ?) AND user_id = ?"
+  ).all(`+${days} days`, req.user.userId);
   res.json(products);
 });
 
@@ -161,8 +164,8 @@ router.post('/bulk-update', (req, res) => {
   if (!allowed.includes(field)) return res.status(400).json({ error: 'Invalid field' });
 
   try {
-    const stmt = db.prepare(`UPDATE products SET ${field} = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`);
-    const tx = db.transaction(() => { for (const id of ids) stmt.run(value, id); });
+    const stmt = db.prepare(`UPDATE products SET ${field} = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?`);
+    const tx = db.transaction(() => { for (const id of ids) stmt.run(value, id, req.user.userId); });
     tx();
     res.json({ message: `Updated ${ids.length} products` });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -172,7 +175,7 @@ router.delete('/:id', (req, res) => {
   const id = parseInt(req.params.id);
   if (isNaN(id) || id < 1) return res.status(400).json({ error: 'Invalid product ID' });
   try {
-    const result = db.prepare('DELETE FROM products WHERE id = ?').run(id);
+    const result = db.prepare('DELETE FROM products WHERE id = ? AND user_id = ?').run(id, req.user.userId);
     if (result.changes === 0) return res.status(404).json({ error: 'Product not found' });
     res.json({ message: 'Product deleted' });
   } catch (err) {

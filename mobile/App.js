@@ -8,6 +8,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { SidebarContext } from './src/context/SidebarContext';
+import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import PendingScreen from './src/screens/PendingScreen';
@@ -74,15 +75,16 @@ function CustomersStack() {
 }
 
 function MainTabs() {
+  const { colors, isDark } = useTheme();
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarIcon: ({ focused }) => <TabIcon label={route.name} focused={focused} />,
-        tabBarActiveTintColor: '#007bff',
-        tabBarInactiveTintColor: '#999',
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textLight,
         tabBarStyle: {
-          backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#e0e0e0',
+          backgroundColor: colors.tabBarBg, borderTopWidth: 1, borderTopColor: colors.tabBarBorder,
           paddingBottom: Platform.OS === 'ios' ? 20 : 4, paddingTop: 4, height: Platform.OS === 'ios' ? 80 : 60,
         },
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
@@ -103,6 +105,7 @@ function MainTabs() {
 
 function AppContent() {
   const { token, loading, user } = useAuth();
+  const { isDark } = useTheme();
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const navigationRef = useRef(null);
 
@@ -119,7 +122,7 @@ function AppContent() {
   }, []);
 
   if (loading) {
-    return <View style={{ flex: 1, backgroundColor: '#1a1a2e', justifyContent: 'center', alignItems: 'center' }}>
+    return <View style={{ flex: 1, backgroundColor: isDark ? '#121212' : '#1a1a2e', justifyContent: 'center', alignItems: 'center' }}>
       <Text style={{ color: '#fff', fontSize: 16 }}>Loading...</Text>
     </View>;
   }
@@ -135,7 +138,7 @@ function AppContent() {
         openSidebar: () => setSidebarVisible(true),
       }}>
         <NavigationContainer ref={navigationRef}>
-          <StatusBar style="dark" />
+          <StatusBar style={isDark ? 'light' : 'dark'} />
           <Stack.Navigator screenOptions={{ headerShown: false }}>
             <Stack.Screen name="Main" component={MainTabs} />
             <Stack.Screen name="Scanner" component={ScannerScreen} options={{ presentation: 'fullScreenModal' }} />
@@ -183,9 +186,11 @@ function AppContent() {
 export default function App() {
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <AppContent />
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <AppContent />
+        </AuthProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }

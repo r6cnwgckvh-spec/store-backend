@@ -3,16 +3,18 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, TextInput, S
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { api } from '../api';
 import { formatCurrency } from '../utils/helpers';
+import { useTheme } from '../context/ThemeContext';
 
 const paymentMethods = ['Cash', 'UPI', 'Card', 'Credit'];
 
 export default function CartScreen({ route, navigation }) {
+  const { colors } = useTheme();
   const [cart, setCart] = useState([]);
   const [customer, setCustomer] = useState({ id: null, name: '', phone: '' });
   const [showCustomer, setShowCustomer] = useState(false);
   const [customers, setCustomers] = useState([]);
   const [submitting, setSubmitting] = useState(false);
-  const [discountType, setDiscountType] = useState('amount'); // 'amount' or 'percent'
+  const [discountType, setDiscountType] = useState('amount');
   const [discount, setDiscount] = useState('0');
   const [paymentMethod, setPaymentMethod] = useState('Cash');
   const [showFav, setShowFav] = useState(false);
@@ -22,6 +24,7 @@ export default function CartScreen({ route, navigation }) {
   const [showSearch, setShowSearch] = useState(false);
   const [printBill, setPrintBill] = useState(true);
   const searchTimer = useRef(null);
+  const styles = getStyles(colors);
 
   const addToCart = useCallback(async (barcode, productData) => {
     try {
@@ -126,7 +129,7 @@ export default function CartScreen({ route, navigation }) {
     return (
     <View style={styles.item}>
       <TouchableOpacity style={styles.itemDel} onPress={() => removeItem(item.id)}>
-        <Text style={{ color: '#dc3545', fontSize: 10, fontWeight: '700' }}>✕</Text>
+        <Text style={{ color: colors.danger, fontSize: 10, fontWeight: '700' }}>✕</Text>
       </TouchableOpacity>
       <View style={{ flex: 1, marginLeft: 8 }}>
         <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
@@ -162,7 +165,7 @@ export default function CartScreen({ route, navigation }) {
       </TouchableOpacity>
       {showSearch && (
         <View style={styles.searchBox}>
-          <TextInput style={styles.searchInput} placeholder="Type product name..." value={searchProd} onChangeText={handleSearchChange} />
+          <TextInput style={styles.searchInput} placeholder="Type product name..." placeholderTextColor={colors.placeholder} value={searchProd} onChangeText={handleSearchChange} />
           {searchResults.length > 0 && (
             <View style={styles.searchResults}>
               {searchResults.map(p => (
@@ -196,19 +199,19 @@ export default function CartScreen({ route, navigation }) {
       )}
 
       <TouchableOpacity style={styles.custBtn} onPress={() => { loadCustomers(); setShowCustomer(!showCustomer); }}>
-        <Text style={{ color: customer.name ? '#333' : '#999', fontWeight: customer.name ? '600' : '400' }}>
+        <Text style={{ color: customer.name ? colors.textSecondary : colors.textLight, fontWeight: customer.name ? '600' : '400' }}>
           👤 {customer.name || 'Add Customer (Optional)'}
         </Text>
       </TouchableOpacity>
       {showCustomer && (
         <View style={styles.custForm}>
-          <TextInput style={styles.input} placeholder="Customer name" value={customer.name} onChangeText={t => setCustomer(p => ({ ...p, name: t }))} />
-          <TextInput style={styles.input} placeholder="Phone number" value={customer.phone} onChangeText={t => setCustomer(p => ({ ...p, phone: t }))} keyboardType="phone-pad" />
+          <TextInput style={styles.input} placeholder="Customer name" placeholderTextColor={colors.placeholder} value={customer.name} onChangeText={t => setCustomer(p => ({ ...p, name: t }))} />
+          <TextInput style={styles.input} placeholder="Phone number" placeholderTextColor={colors.placeholder} value={customer.phone} onChangeText={t => setCustomer(p => ({ ...p, phone: t }))} keyboardType="phone-pad" />
           {customers.slice(0, 5).map(c => (
-            <TouchableOpacity key={c.id} style={{ padding: 10, borderBottomWidth: 1, borderColor: '#f0f0f0' }}
+            <TouchableOpacity key={c.id} style={{ padding: 10, borderBottomWidth: 1, borderColor: colors.border }}
               onPress={() => { setCustomer({ id: c.id, name: c.name, phone: c.phone }); setShowCustomer(false); }}>
-              <Text style={{ fontWeight: '600' }}>{c.name}</Text>
-              {c.phone ? <Text style={{ color: '#999', fontSize: 12 }}>{c.phone}</Text> : null}
+              <Text style={{ fontWeight: '600', color: colors.text }}>{c.name}</Text>
+              {c.phone ? <Text style={{ color: colors.textLight, fontSize: 12 }}>{c.phone}</Text> : null}
             </TouchableOpacity>
           ))}
         </View>
@@ -220,8 +223,8 @@ export default function CartScreen({ route, navigation }) {
         ListEmptyComponent={
           <View style={{ alignItems: 'center', paddingTop: 60 }}>
             <Text style={{ fontSize: 60, marginBottom: 16, opacity: 0.3 }}>🛒</Text>
-            <Text style={{ fontSize: 18, color: '#999' }}>Cart is empty</Text>
-            <Text style={{ fontSize: 13, color: '#ccc', marginTop: 4 }}>Scan or tap Quick Add</Text>
+            <Text style={{ fontSize: 18, color: colors.textLight }}>Cart is empty</Text>
+            <Text style={{ fontSize: 13, color: colors.watermark, marginTop: 4 }}>Scan or tap Quick Add</Text>
           </View>
         }
       />
@@ -229,7 +232,7 @@ export default function CartScreen({ route, navigation }) {
       {cart.length > 0 && (
         <View style={styles.footer}>
           <View style={styles.footerRow}>
-            <Text style={{ fontSize: 13, color: '#666' }}>Discount</Text>
+            <Text style={{ fontSize: 13, color: colors.textMuted }}>Discount</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <TouchableOpacity style={[styles.discTypeBtn, discountType === 'amount' && styles.discTypeActive]}
                 onPress={() => { setDiscountType('amount'); setDiscount('0'); }}>
@@ -239,16 +242,16 @@ export default function CartScreen({ route, navigation }) {
                 onPress={() => { setDiscountType('percent'); setDiscount('0'); }}>
                 <Text style={[styles.discTypeText, discountType === 'percent' && styles.discTypeTextActive]}>%</Text>
               </TouchableOpacity>
-              <TextInput style={styles.discountInput} value={discount} onChangeText={setDiscount} keyboardType="decimal-pad" placeholder="0" />
+              <TextInput style={styles.discountInput} value={discount} onChangeText={setDiscount} keyboardType="decimal-pad" placeholder="0" placeholderTextColor={colors.placeholder} />
             </View>
           </View>
           {discAmount > 0 && (
-            <Text style={{ fontSize: 12, color: '#28a745', textAlign: 'right', marginBottom: 4 }}>
+            <Text style={{ fontSize: 12, color: colors.success, textAlign: 'right', marginBottom: 4 }}>
               Saving: {formatCurrency(discAmount)}
             </Text>
           )}
           <View style={styles.footerRow}>
-            <Text style={{ fontSize: 13, color: '#666' }}>Payment</Text>
+            <Text style={{ fontSize: 13, color: colors.textMuted }}>Payment</Text>
             <View style={styles.payRow}>
               {paymentMethods.map(pm => (
                 <TouchableOpacity key={pm} style={[styles.payBtn, paymentMethod === pm && styles.payActive]} onPress={() => setPaymentMethod(pm)}>
@@ -258,13 +261,13 @@ export default function CartScreen({ route, navigation }) {
             </View>
           </View>
           <View style={styles.footerRow}>
-            <Text style={{ fontSize: 13, color: '#666' }}>🖨️ Print Bill</Text>
-            <Switch value={printBill} onValueChange={setPrintBill} trackColor={{ false: '#ccc', true: '#28a745' }} thumbColor="#fff" />
+            <Text style={{ fontSize: 13, color: colors.textMuted }}>🖨️ Print Bill</Text>
+            <Switch value={printBill} onValueChange={setPrintBill} trackColor={{ false: colors.watermark, true: colors.success }} thumbColor={colors.card} />
           </View>
           <View style={styles.totalRow}>
             <View>
-              <Text style={{ fontSize: 12, color: '#999' }}>Items: {cart.reduce((s, i) => s + i.quantity, 0)}</Text>
-              <Text style={{ fontSize: 12, color: '#999' }}>Total: {formatCurrency(subtotal)}</Text>
+              <Text style={{ fontSize: 12, color: colors.textLight }}>Items: {cart.reduce((s, i) => s + i.quantity, 0)}</Text>
+              <Text style={{ fontSize: 12, color: colors.textLight }}>Total: {formatCurrency(subtotal)}</Text>
             </View>
             <Text style={styles.totalAmount}>{formatCurrency(total)}</Text>
           </View>
@@ -277,54 +280,54 @@ export default function CartScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#f5f5f5' },
+const getStyles = (colors) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: colors.background },
   topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 },
-  topTitle: { fontSize: 22, fontWeight: 'bold', color: '#1a1a2e' },
-  topCount: { fontSize: 14, color: '#999', fontWeight: '600' },
-  scanBtn: { backgroundColor: '#1a1a2e', padding: 14, marginHorizontal: 12, marginBottom: 8, borderRadius: 10, alignItems: 'center' },
-  scanBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  topTitle: { fontSize: 22, fontWeight: 'bold', color: colors.text },
+  topCount: { fontSize: 14, color: colors.textLight, fontWeight: '600' },
+  scanBtn: { backgroundColor: colors.headerBg, padding: 14, marginHorizontal: 12, marginBottom: 8, borderRadius: 10, alignItems: 'center' },
+  scanBtnText: { color: colors.headerText, fontSize: 16, fontWeight: '600' },
   searchToggle: { paddingHorizontal: 16, marginBottom: 4 },
-  searchToggleText: { fontSize: 13, fontWeight: '600', color: '#007bff' },
+  searchToggleText: { fontSize: 13, fontWeight: '600', color: colors.primary },
   searchBox: { marginHorizontal: 12, marginBottom: 8, zIndex: 10 },
-  searchInput: { backgroundColor: '#fff', borderRadius: 10, padding: 10, fontSize: 14, borderWidth: 1, borderColor: '#e0e0e0' },
-  searchResults: { backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: '#e0e0e0', marginTop: 4, elevation: 5 },
-  searchResultItem: { flexDirection: 'row', justifyContent: 'space-between', padding: 12, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
-  searchResultName: { fontSize: 14, fontWeight: '600', color: '#333' },
-  searchResultPrice: { fontSize: 13, color: '#28a745', fontWeight: '700' },
+  searchInput: { backgroundColor: colors.inputBg, borderRadius: 10, padding: 10, fontSize: 14, borderWidth: 1, borderColor: colors.border },
+  searchResults: { backgroundColor: colors.card, borderRadius: 10, borderWidth: 1, borderColor: colors.border, marginTop: 4, elevation: 5 },
+  searchResultItem: { flexDirection: 'row', justifyContent: 'space-between', padding: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
+  searchResultName: { fontSize: 14, fontWeight: '600', color: colors.textSecondary },
+  searchResultPrice: { fontSize: 13, color: colors.success, fontWeight: '700' },
   favToggle: { paddingHorizontal: 16, marginBottom: 4 },
-  favToggleText: { fontSize: 13, fontWeight: '600', color: '#007bff' },
+  favToggleText: { fontSize: 13, fontWeight: '600', color: colors.primary },
   favGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12, gap: 8, marginBottom: 8 },
-  favItem: { width: '30%', backgroundColor: '#fff', borderRadius: 10, padding: 10, alignItems: 'center', elevation: 1 },
+  favItem: { width: '30%', backgroundColor: colors.card, borderRadius: 10, padding: 10, alignItems: 'center', elevation: 1 },
   favIcon: { fontSize: 24, marginBottom: 4 },
-  favName: { fontSize: 11, fontWeight: '600', color: '#333', textAlign: 'center' },
-  favPrice: { fontSize: 10, color: '#28a745', fontWeight: '700', marginTop: 2 },
-  custBtn: { backgroundColor: '#fff', padding: 14, marginHorizontal: 12, marginBottom: 8, borderRadius: 10, elevation: 1 },
-  custForm: { backgroundColor: '#fff', marginHorizontal: 12, padding: 14, borderRadius: 10, elevation: 2, marginBottom: 8 },
-  input: { borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 8, padding: 10, fontSize: 14, marginBottom: 8 },
-  item: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 10, padding: 12, marginBottom: 6, elevation: 1 },
-  itemDel: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#ffe8e8', justifyContent: 'center', alignItems: 'center' },
-  itemName: { fontSize: 14, fontWeight: '600', color: '#333' },
-  itemPrice: { fontSize: 11, color: '#999', marginTop: 1 },
+  favName: { fontSize: 11, fontWeight: '600', color: colors.textSecondary, textAlign: 'center' },
+  favPrice: { fontSize: 10, color: colors.success, fontWeight: '700', marginTop: 2 },
+  custBtn: { backgroundColor: colors.card, padding: 14, marginHorizontal: 12, marginBottom: 8, borderRadius: 10, elevation: 1 },
+  custForm: { backgroundColor: colors.card, marginHorizontal: 12, padding: 14, borderRadius: 10, elevation: 2, marginBottom: 8 },
+  input: { borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 10, fontSize: 14, marginBottom: 8, backgroundColor: colors.inputBg },
+  item: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.card, borderRadius: 10, padding: 12, marginBottom: 6, elevation: 1 },
+  itemDel: { width: 20, height: 20, borderRadius: 10, backgroundColor: colors.danger + '20', justifyContent: 'center', alignItems: 'center' },
+  itemName: { fontSize: 14, fontWeight: '600', color: colors.textSecondary },
+  itemPrice: { fontSize: 11, color: colors.textLight, marginTop: 1 },
   qty: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 6 },
-  qtyBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' },
-  qtyBtnText: { fontSize: 16, fontWeight: '700', color: '#333' },
-  qtyText: { fontSize: 15, fontWeight: '700', width: 28, textAlign: 'center' },
-  itemTotal: { fontSize: 15, fontWeight: '700', color: '#28a745', minWidth: 65, textAlign: 'right' },
-  footer: { backgroundColor: '#fff', padding: 16, elevation: 4, borderTopWidth: 1, borderTopColor: '#e0e0e0', paddingBottom: 24 },
+  qtyBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.border, justifyContent: 'center', alignItems: 'center' },
+  qtyBtnText: { fontSize: 16, fontWeight: '700', color: colors.textSecondary },
+  qtyText: { fontSize: 15, fontWeight: '700', width: 28, textAlign: 'center', color: colors.text },
+  itemTotal: { fontSize: 15, fontWeight: '700', color: colors.success, minWidth: 65, textAlign: 'right' },
+  footer: { backgroundColor: colors.card, padding: 16, elevation: 4, borderTopWidth: 1, borderTopColor: colors.border, paddingBottom: 24 },
   footerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  discTypeBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, backgroundColor: '#f0f0f0' },
-  discTypeActive: { backgroundColor: '#007bff' },
-  discTypeText: { fontSize: 13, fontWeight: '700', color: '#666' },
-  discTypeTextActive: { color: '#fff' },
-  discountInput: { borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, fontSize: 15, width: 70, textAlign: 'right' },
+  discTypeBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, backgroundColor: colors.border },
+  discTypeActive: { backgroundColor: colors.primary },
+  discTypeText: { fontSize: 13, fontWeight: '700', color: colors.textMuted },
+  discTypeTextActive: { color: colors.headerText },
+  discountInput: { borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, fontSize: 15, width: 70, textAlign: 'right', color: colors.text },
   payRow: { flexDirection: 'row', gap: 4 },
-  payBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, backgroundColor: '#f0f0f0' },
-  payActive: { backgroundColor: '#007bff' },
-  payText: { fontSize: 11, fontWeight: '600', color: '#666' },
-  payTextActive: { color: '#fff' },
-  totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#e0e0e0' },
-  totalAmount: { fontSize: 24, fontWeight: 'bold', color: '#1a1a2e' },
-  checkout: { backgroundColor: '#28a745', borderRadius: 12, padding: 16, alignItems: 'center', elevation: 3 },
-  checkoutText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  payBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, backgroundColor: colors.border },
+  payActive: { backgroundColor: colors.primary },
+  payText: { fontSize: 11, fontWeight: '600', color: colors.textMuted },
+  payTextActive: { color: colors.headerText },
+  totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.border },
+  totalAmount: { fontSize: 24, fontWeight: 'bold', color: colors.text },
+  checkout: { backgroundColor: colors.success, borderRadius: 12, padding: 16, alignItems: 'center', elevation: 3 },
+  checkoutText: { color: colors.headerText, fontSize: 16, fontWeight: '700' },
 });

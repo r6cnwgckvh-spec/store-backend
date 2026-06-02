@@ -4,9 +4,10 @@ const db = require('../database');
 
 router.get('/', (req, res) => {
   const { limit } = req.query;
-  let query = 'SELECT * FROM purchases ORDER BY created_at DESC';
-  if (limit) query += ' LIMIT ?';
-  res.json(db.prepare(query).all(...(limit ? [parseInt(limit)] : [])));
+  let query = 'SELECT * FROM purchases WHERE user_id = ? ORDER BY created_at DESC';
+  const params = [req.user.userId];
+  if (limit) { query += ' LIMIT ?'; params.push(parseInt(limit)); }
+  res.json(db.prepare(query).all(...params));
 });
 
 router.post('/', (req, res) => {
@@ -21,8 +22,8 @@ router.post('/', (req, res) => {
       .run(quantity, product_id);
 
     const result = db.prepare(
-      'INSERT INTO purchases (product_id, product_name, quantity, cost_price, supplier, notes) VALUES (?, ?, ?, ?, ?, ?)'
-    ).run(product_id, product.name, quantity, cost_price || 0, supplier || '', notes || '');
+      'INSERT INTO purchases (product_id, product_name, quantity, cost_price, supplier, notes, user_id) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    ).run(product_id, product.name, quantity, cost_price || 0, supplier || '', notes || '', req.user.userId);
 
     return result.lastInsertRowid;
   });

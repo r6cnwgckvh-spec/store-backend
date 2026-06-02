@@ -13,6 +13,9 @@ router.get('/', (req, res) => {
   const params = [];
   const conditions = [];
 
+  conditions.push('user_id = ?');
+  params.push(req.user.userId);
+
   if (customer_id) { conditions.push('customer_id = ?'); params.push(customer_id); }
   if (start_date) { conditions.push('created_at >= ?'); params.push(start_date); }
   if (end_date) { conditions.push('created_at <= ?'); params.push(end_date); }
@@ -30,7 +33,7 @@ router.get('/', (req, res) => {
     params.push(`%${search}%`, `%${search}%`, `%${search}%`);
   }
 
-  const where = conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : '';
+  const where = ' WHERE ' + conditions.join(' AND ');
 
   const { total } = db.prepare(countQuery + where).get(...params);
   const orders = db.prepare(query + where + ' ORDER BY created_at DESC LIMIT ? OFFSET ?').all(...params, limitNum, offset);
@@ -40,7 +43,7 @@ router.get('/', (req, res) => {
 router.get('/:id', (req, res) => {
   const id = parseInt(req.params.id);
   if (isNaN(id) || id < 1) return res.status(400).json({ error: 'Invalid order ID' });
-  const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(id);
+  const order = db.prepare('SELECT * FROM orders WHERE id = ? AND user_id = ?').get(id, req.user.userId);
   if (!order) return res.status(404).json({ error: 'Order not found' });
   const items = db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(id);
   const returns = db.prepare('SELECT * FROM returns WHERE order_id = ?').all(id);
@@ -62,8 +65,8 @@ router.post('/', (req, res) => {
   }
 
   const insertOrder = db.prepare(
-    `INSERT INTO orders (customer_id, customer_name, customer_phone, total_amount, discount, payment_method, notes, items_count)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO orders (customer_id, customer_name, customer_phone, total_amount, discount, payment_method, notes, items_count, user_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   const insertItem = db.prepare(
     `INSERT INTO order_items (order_id, product_id, product_name, product_barcode, quantity, price) VALUES (?, ?, ?, ?, ?, ?)`
@@ -92,7 +95,7 @@ router.post('/', (req, res) => {
 
     const result = insertOrder.run(
       customer_id || null, customer_name || '', customer_phone || '',
-      total, disc, payment_method || 'Cash', notes || '', totalItems
+      total, disc, payment_method || 'Cash', notes || '', totalItems, req.user.userId
     );
     const orderId = result.lastInsertRowid;
 
@@ -123,7 +126,7 @@ router.post('/:id/return', (req, res) => {
   }
 
   const transaction = db.transaction(() => {
-    const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(id);
+    const order = db.prepare('SELECT * FROM orders WHERE id = ? AND user_id = ?').get(id, req.user.userId);
     if (!order) throw new Error('Order not found');
 
     let totalRefund = 0;
@@ -172,6 +175,8 @@ router.delete('/:id', (req, res) => {
   const id = parseInt(req.params.id);
   if (isNaN(id) || id < 1) return res.status(400).json({ error: 'Invalid order ID' });
   try {
+    const order = db.prepare('SELECT * FROM orders WHERE id = ? AND user_id = ?').get(id, req.user.userId);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
     const items = db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(id);
     const restoreStock = db.prepare('UPDATE products SET stock = stock + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
     const transaction = db.transaction(() => {

@@ -2,8 +2,11 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { api } from '../api';
+import { useTheme } from '../context/ThemeContext';
 
 export default function CustomerFormScreen({ navigation }) {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -41,11 +44,11 @@ export default function CustomerFormScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#f5f5f5' },
-  title: { fontSize: 22, fontWeight: 'bold', marginBottom: 20, color: '#1a1a2e' },
-  label: { fontSize: 13, fontWeight: '600', color: '#555', marginBottom: 6, marginLeft: 2 },
-  input: { backgroundColor: '#fff', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, borderWidth: 1, borderColor: '#e0e0e0', marginBottom: 16 },
-  btn: { backgroundColor: '#007bff', borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 10, elevation: 3 },
-  btnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+const getStyles = (colors) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: colors.background },
+  title: { fontSize: 22, fontWeight: 'bold', marginBottom: 20, color: colors.text },
+  label: { fontSize: 13, fontWeight: '600', color: colors.textMuted, marginBottom: 6, marginLeft: 2 },
+  input: { backgroundColor: colors.card, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, borderWidth: 1, borderColor: colors.border, marginBottom: 16 },
+  btn: { backgroundColor: colors.primary, borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 10, elevation: 3 },
+  btnText: { color: colors.card, fontSize: 16, fontWeight: '700' },
 });

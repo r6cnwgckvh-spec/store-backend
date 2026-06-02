@@ -3,23 +3,10 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
-
-const Field = ({ label, value, onChange, placeholder, keyboardType, multiline }) => (
-  <View style={{ marginBottom: 14 }}>
-    <Text style={styles.label}>{label}</Text>
-    <TextInput
-      style={[styles.input, multiline && { minHeight: 60 }]}
-      value={value}
-      onChangeText={onChange}
-      placeholder={placeholder}
-      placeholderTextColor="#999"
-      keyboardType={keyboardType || 'default'}
-      multiline={multiline}
-    />
-  </View>
-);
+import { useTheme } from '../context/ThemeContext';
 
 export default function SettingsScreen({ navigation }) {
+  const { colors, isDark, toggleTheme } = useTheme();
   const { logout, changePin, user } = useAuth();
   const [storeName, setStoreName] = useState('');
   const [address, setAddress] = useState('');
@@ -34,6 +21,22 @@ export default function SettingsScreen({ navigation }) {
   const [newPin, setNewPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [changingPin, setChangingPin] = useState(false);
+  const styles = getStyles(colors);
+
+  const Field = ({ label, value, onChange, placeholder, keyboardType, multiline }) => (
+    <View style={{ marginBottom: 14 }}>
+      <Text style={styles.label}>{label}</Text>
+      <TextInput
+        style={[styles.input, multiline && { minHeight: 60 }]}
+        value={value}
+        onChangeText={onChange}
+        placeholder={placeholder}
+        placeholderTextColor={colors.placeholder}
+        keyboardType={keyboardType || 'default'}
+        multiline={multiline}
+      />
+    </View>
+  );
 
   useEffect(() => {
     (async () => {
@@ -82,7 +85,7 @@ export default function SettingsScreen({ navigation }) {
     setChangingPin(false);
   };
 
-  if (loading) return <SafeAreaView style={styles.safe}><Text style={{ textAlign: 'center', marginTop: 40, color: '#999' }}>Loading...</Text></SafeAreaView>;
+  if (loading) return <SafeAreaView style={styles.safe}><Text style={{ textAlign: 'center', marginTop: 40, color: colors.textLight }}>Loading...</Text></SafeAreaView>;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -110,8 +113,8 @@ export default function SettingsScreen({ navigation }) {
 
         <Text style={styles.label}>Currency Symbol</Text>
         <View style={styles.currencyRow}>
-          <TextInput style={[styles.input, { flex: 0, width: 60 }]} value={currency} onChangeText={setCurrency} placeholder="₹" />
-          <TextInput style={[styles.input, { flex: 1 }]} value={currencyCode} onChangeText={setCurrencyCode} placeholder="INR" />
+          <TextInput style={[styles.input, { flex: 0, width: 60 }]} value={currency} onChangeText={setCurrency} placeholder="₹" placeholderTextColor={colors.placeholder} />
+          <TextInput style={[styles.input, { flex: 1 }]} value={currencyCode} onChangeText={setCurrencyCode} placeholder="INR" placeholderTextColor={colors.placeholder} />
         </View>
 
         <TouchableOpacity style={styles.btn} onPress={save}>
@@ -132,6 +135,10 @@ export default function SettingsScreen({ navigation }) {
         </View>
 
         <View style={styles.divider} />
+
+        <TouchableOpacity style={[styles.themeBtn, { backgroundColor: colors.primary }]} onPress={toggleTheme}>
+          <Text style={styles.themeBtnText}>{isDark ? '☀️ Light Mode' : '🌙 Dark Mode'}</Text>
+        </TouchableOpacity>
 
         <TouchableOpacity style={styles.changePinBtn} onPress={() => setShowChangePin(true)}>
           <Text style={styles.changePinText}>🔑 Change PIN</Text>
@@ -155,14 +162,14 @@ export default function SettingsScreen({ navigation }) {
         <View style={styles.modalOverlay}>
           <View style={styles.modal}>
             <Text style={styles.modalTitle}>Change PIN</Text>
-            <TextInput style={styles.modalInput} placeholder="Current PIN" placeholderTextColor="#666"
+            <TextInput style={styles.modalInput} placeholder="Current PIN" placeholderTextColor={colors.textSecondary}
               value={oldPin} onChangeText={setOldPin} keyboardType="number-pad" secureTextEntry maxLength={10} />
-            <TextInput style={styles.modalInput} placeholder="New PIN" placeholderTextColor="#666"
+            <TextInput style={styles.modalInput} placeholder="New PIN" placeholderTextColor={colors.textSecondary}
               value={newPin} onChangeText={setNewPin} keyboardType="number-pad" secureTextEntry maxLength={10} />
-            <TextInput style={styles.modalInput} placeholder="Confirm New PIN" placeholderTextColor="#666"
+            <TextInput style={styles.modalInput} placeholder="Confirm New PIN" placeholderTextColor={colors.textSecondary}
               value={confirmPin} onChangeText={setConfirmPin} keyboardType="number-pad" secureTextEntry maxLength={10} />
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
-              <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#666', flex: 1 }]}
+              <TouchableOpacity style={[styles.modalBtn, { backgroundColor: colors.textMuted, flex: 1 }]}
                 onPress={() => { setShowChangePin(false); setOldPin(''); setNewPin(''); setConfirmPin(''); }}>
                 <Text style={styles.modalBtnText}>Cancel</Text>
               </TouchableOpacity>
@@ -178,39 +185,41 @@ export default function SettingsScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#f5f5f5' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e0e0e0' },
-  backBtn: { fontSize: 16, color: '#007bff', fontWeight: '600' },
-  title: { fontSize: 18, fontWeight: '700', color: '#1a1a2e' },
+const getStyles = (colors) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: colors.background },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, backgroundColor: colors.card, borderBottomWidth: 1, borderBottomColor: colors.border },
+  backBtn: { fontSize: 16, color: colors.primary, fontWeight: '600' },
+  title: { fontSize: 18, fontWeight: '700', color: colors.text },
   content: { padding: 16 },
-  userCard: { backgroundColor: '#1a1a2e', borderRadius: 12, padding: 16, marginBottom: 20, alignItems: 'center' },
-  userName: { fontSize: 18, fontWeight: '700', color: '#fff' },
-  userEmail: { fontSize: 13, color: '#aaa', marginTop: 2 },
-  userRole: { fontSize: 13, color: '#e94560', marginTop: 4, fontWeight: '600' },
-  label: { fontSize: 13, fontWeight: '600', color: '#555', marginBottom: 6 },
+  userCard: { backgroundColor: colors.headerBg, borderRadius: 12, padding: 16, marginBottom: 20, alignItems: 'center' },
+  userName: { fontSize: 18, fontWeight: '700', color: colors.headerText },
+  userEmail: { fontSize: 13, color: colors.textLight, marginTop: 2 },
+  userRole: { fontSize: 13, color: colors.danger, marginTop: 4, fontWeight: '600' },
+  label: { fontSize: 13, fontWeight: '600', color: colors.textMuted, marginBottom: 6 },
   input: {
-    backgroundColor: '#fff', borderRadius: 8, padding: 12, fontSize: 15,
-    borderWidth: 1, borderColor: '#e0e0e0', color: '#333',
+    backgroundColor: colors.inputBg, borderRadius: 8, padding: 12, fontSize: 15,
+    borderWidth: 1, borderColor: colors.border, color: colors.textSecondary,
   },
   currencyRow: { flexDirection: 'row', gap: 10, marginBottom: 14 },
-  btn: { backgroundColor: '#28a745', borderRadius: 10, padding: 14, alignItems: 'center' },
-  btnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  adminBtn: { backgroundColor: '#1a1a2e', borderRadius: 10, padding: 14, alignItems: 'center', marginTop: 10 },
-  adminBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  divider: { borderTopWidth: 1, borderTopColor: '#e0e0e0', marginVertical: 20 },
-  infoCard: { backgroundColor: '#e8f4fd', borderRadius: 10, padding: 14, marginBottom: 10 },
-  infoTitle: { fontSize: 13, fontWeight: '700', color: '#0056b3', marginBottom: 4 },
-  infoText: { fontSize: 12, color: '#444', lineHeight: 18 },
+  btn: { backgroundColor: colors.success, borderRadius: 10, padding: 14, alignItems: 'center' },
+  btnText: { color: colors.headerText, fontSize: 16, fontWeight: '700' },
+  adminBtn: { backgroundColor: colors.headerBg, borderRadius: 10, padding: 14, alignItems: 'center', marginTop: 10 },
+  adminBtnText: { color: colors.headerText, fontSize: 15, fontWeight: '700' },
+  divider: { borderTopWidth: 1, borderTopColor: colors.border, marginVertical: 20 },
+  themeBtn: { borderRadius: 10, padding: 14, alignItems: 'center', marginBottom: 10 },
+  themeBtnText: { color: colors.headerText, fontSize: 15, fontWeight: '700' },
+  infoCard: { backgroundColor: colors.primary + '18', borderRadius: 10, padding: 14, marginBottom: 10 },
+  infoTitle: { fontSize: 13, fontWeight: '700', color: colors.primary, marginBottom: 4 },
+  infoText: { fontSize: 12, color: colors.textMuted, lineHeight: 18 },
   changePinBtn: { backgroundColor: '#6f42c1', borderRadius: 10, padding: 14, alignItems: 'center', marginBottom: 10 },
-  changePinText: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  logoutBtn: { backgroundColor: '#dc3545', borderRadius: 10, padding: 14, alignItems: 'center' },
-  logoutText: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  watermark: { textAlign: 'center', fontSize: 12, color: '#999', marginTop: 10 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 24 },
-  modal: { backgroundColor: '#fff', borderRadius: 16, padding: 24 },
-  modalTitle: { fontSize: 20, fontWeight: '700', color: '#1a1a2e', marginBottom: 16, textAlign: 'center' },
-  modalInput: { backgroundColor: '#f5f5f5', borderRadius: 10, padding: 14, fontSize: 16, color: '#333', marginBottom: 10, borderWidth: 1, borderColor: '#e0e0e0' },
+  changePinText: { color: colors.headerText, fontSize: 15, fontWeight: '700' },
+  logoutBtn: { backgroundColor: colors.danger, borderRadius: 10, padding: 14, alignItems: 'center' },
+  logoutText: { color: colors.headerText, fontSize: 15, fontWeight: '700' },
+  watermark: { textAlign: 'center', fontSize: 12, color: colors.textLight, marginTop: 10 },
+  modalOverlay: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'center', padding: 24 },
+  modal: { backgroundColor: colors.card, borderRadius: 16, padding: 24 },
+  modalTitle: { fontSize: 20, fontWeight: '700', color: colors.text, marginBottom: 16, textAlign: 'center' },
+  modalInput: { backgroundColor: colors.background, borderRadius: 10, padding: 14, fontSize: 16, color: colors.textSecondary, marginBottom: 10, borderWidth: 1, borderColor: colors.border },
   modalBtn: { borderRadius: 10, padding: 14, alignItems: 'center' },
-  modalBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  modalBtnText: { color: colors.headerText, fontSize: 15, fontWeight: '700' },
 });

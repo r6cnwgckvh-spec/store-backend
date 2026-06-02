@@ -4,22 +4,25 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { api } from '../api';
 import { formatCurrency, formatDate, stockStatus } from '../utils/helpers';
 import { SidebarContext } from '../context/SidebarContext';
+import { useTheme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
-const StatCard = ({ label, value, color }) => (
-  <View style={[styles.statCard, { borderLeftColor: color }]}>
-    <Text style={[styles.statValue, { color }]}>{value}</Text>
-    <Text style={styles.statLabel}>{label}</Text>
-  </View>
-);
-
 export default function HomeScreen({ navigation }) {
+  const { colors } = useTheme();
   const { openSidebar } = useContext(SidebarContext);
   const [stats, setStats] = useState({ products: 0, lowStock: 0, outOfStock: 0 });
   const [lowStockItems, setLowStockItems] = useState([]);
   const [recentOrders, setRecentOrders] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
+  const styles = getStyles(colors);
+
+  const StatCard = ({ label, value, color }) => (
+    <View style={[styles.statCard, { borderLeftColor: color }]}>
+      <Text style={[styles.statValue, { color }]}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
 
   const loadData = useCallback(async () => {
     try {
@@ -58,9 +61,9 @@ export default function HomeScreen({ navigation }) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         <View style={styles.statsRow}>
-          <StatCard label="Products" value={stats.products} color="#007bff" />
-          <StatCard label="Low Stock" value={stats.lowStock} color="#ffc107" />
-          <StatCard label="Out of Stock" value={stats.outOfStock} color="#dc3545" />
+          <StatCard label="Products" value={stats.products} color={colors.primary} />
+          <StatCard label="Low Stock" value={stats.lowStock} color={colors.warning} />
+          <StatCard label="Out of Stock" value={stats.outOfStock} color={colors.danger} />
         </View>
 
         <View style={styles.quickActions}>
@@ -123,42 +126,42 @@ export default function HomeScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#f5f5f5' },
+const getStyles = (colors) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: colors.background },
   container: { flex: 1 },
   content: { padding: 16 },
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
   menuBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
-  menuIcon: { fontSize: 24, color: '#1a1a2e' },
-  title: { fontSize: 22, fontWeight: 'bold', color: '#1a1a2e' },
+  menuIcon: { fontSize: 24, color: colors.text },
+  title: { fontSize: 22, fontWeight: 'bold', color: colors.text },
   statsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20, gap: 8 },
-  statCard: { flex: 1, backgroundColor: '#fff', borderRadius: 12, padding: 12, borderLeftWidth: 4, elevation: 2 },
+  statCard: { flex: 1, backgroundColor: colors.statsCard, borderRadius: 12, padding: 12, borderLeftWidth: 4, elevation: 2 },
   statValue: { fontSize: 22, fontWeight: 'bold' },
-  statLabel: { fontSize: 11, color: '#666', marginTop: 4 },
+  statLabel: { fontSize: 11, color: colors.textMuted, marginTop: 4 },
   quickActions: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 20, gap: 8 },
-  actionBtn: { width: (width - 48 - 8) / 2, backgroundColor: '#fff', borderRadius: 12, padding: 16, alignItems: 'center', elevation: 2 },
+  actionBtn: { width: (width - 48 - 8) / 2, backgroundColor: colors.card, borderRadius: 12, padding: 16, alignItems: 'center', elevation: 2 },
   actionIcon: { fontSize: 26, marginBottom: 6 },
-  actionText: { fontSize: 13, fontWeight: '600', color: '#333' },
-  sectionTitle: { fontSize: 17, fontWeight: 'bold', marginBottom: 12, color: '#1a1a2e', marginTop: 8 },
+  actionText: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
+  sectionTitle: { fontSize: 17, fontWeight: 'bold', marginBottom: 12, color: colors.text, marginTop: 8 },
   alertItem: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    backgroundColor: '#fff', borderRadius: 10, padding: 14, marginBottom: 8, elevation: 1,
+    backgroundColor: colors.card, borderRadius: 10, padding: 14, marginBottom: 8, elevation: 1,
   },
   alertInfo: { flex: 1 },
-  alertName: { fontSize: 14, fontWeight: '600', color: '#333' },
-  alertBarcode: { fontSize: 12, color: '#999', marginTop: 2 },
+  alertName: { fontSize: 14, fontWeight: '600', color: colors.textSecondary },
+  alertBarcode: { fontSize: 12, color: colors.textLight, marginTop: 2 },
   stockBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
   stockText: { fontSize: 13, fontWeight: '700' },
-  emptyText: { color: '#999', fontSize: 14, marginVertical: 20, textAlign: 'center' },
+  emptyText: { color: colors.textLight, fontSize: 14, marginVertical: 20, textAlign: 'center' },
   orderItem: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    backgroundColor: '#fff', borderRadius: 10, padding: 14, marginBottom: 8, elevation: 1,
+    backgroundColor: colors.card, borderRadius: 10, padding: 14, marginBottom: 8, elevation: 1,
   },
-  orderId: { fontSize: 14, fontWeight: '600', color: '#333' },
-  orderCustomer: { fontSize: 13, color: '#666', marginTop: 2 },
-  orderDate: { fontSize: 11, color: '#999', marginTop: 2 },
+  orderId: { fontSize: 14, fontWeight: '600', color: colors.textSecondary },
+  orderCustomer: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
+  orderDate: { fontSize: 11, color: colors.textLight, marginTop: 2 },
   orderRight: { alignItems: 'flex-end' },
-  orderAmount: { fontSize: 15, fontWeight: '700', color: '#28a745' },
-  orderItems: { fontSize: 11, color: '#999', marginTop: 2 },
-  watermark: { textAlign: 'center', fontSize: 12, color: '#ccc', marginTop: 10 },
+  orderAmount: { fontSize: 15, fontWeight: '700', color: colors.success },
+  orderItems: { fontSize: 11, color: colors.textLight, marginTop: 2 },
+  watermark: { textAlign: 'center', fontSize: 12, color: colors.watermark, marginTop: 10 },
 });
