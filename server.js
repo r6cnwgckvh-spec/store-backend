@@ -43,7 +43,7 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
 app.use('/admin', express.static(path.join(__dirname, 'admin')));
-app.use('/app', express.static(path.join(__dirname, 'webapp')));
+
 app.use('/api/auth', authRouter);
 app.use('/api/images', imagesRouter);
 app.use('/api/admin', adminRouter);
