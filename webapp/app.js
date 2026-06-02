@@ -82,7 +82,10 @@ function navigate(view, params) {
   if (view === 'admin') { window.open('https://store-backend-npao.onrender.com/admin/', '_blank'); return; }
   currentView = view;
   renderView(view, params);
-  if (window.innerWidth <= 768) toggleSidebar();
+  if (window.innerWidth <= 768) {
+    $('sidebar')?.classList.remove('open');
+    $('sidebar-overlay')?.classList.remove('open');
+  }
 }
 
 function renderAuth() {
