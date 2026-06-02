@@ -33,7 +33,7 @@ function getApiKey() {
   if (process.env.GCP_API_KEY) return `gcp:${process.env.GCP_API_KEY}`;
   const gcp = db.prepare('SELECT gcp_api_key FROM store_settings WHERE user_id = 1').get();
   if (gcp?.gcp_api_key) return `gcp:${gcp.gcp_api_key}`;
-  return '';
+  return 'K87715764688957';
 }
 
 function parseBillText(text) {
