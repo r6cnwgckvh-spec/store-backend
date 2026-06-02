@@ -40,74 +40,59 @@ function parseBillText(text) {
   const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
   const items = [];
   const skipWords = ['total', 'gst', 'tax', 'bill', 'invoice', 'store', 'shop', 'address',
-    'phone', 'date', 'cash', 'change', 'discount', 'sub total', 'subtotal', 'qty',
-    'rate', 'amount', 'hsn', 'sac', 'particulars', 'description', 'item', 'sl no',
-    's.no', 's. no', '#', 'name', 'price', 'cgst', 'sgst', 'igst', 'round',
-    'thank', 'welcome', 'mrp', 'batch', 'expiry', 'free', 'offer'];
+    'phone', 'date', 'cash', 'change', 'discount', 'subtotal', 'particulars',
+    'description', 'thank', 'welcome', 'mrp', 'batch', 'expiry', 'free', 'offer',
+    'cgst', 'sgst', 'igst', 'round', 'off', 'save', 'you', 'saved',
+    'item', 'rate', 'amount', 'qty', 'hsn', 'sac', 'name', 'price',
+    'credit', 'debit', 'card', 'cashier', 'counter', 'sale', 'payment',
+    'change', 'tender', 'receipt', 'copy', 'original', 'duplicate'];
 
   for (const line of lines) {
     const lower = line.toLowerCase().trim();
+    if (lower.length < 4) continue;
 
-    // Skip lines that are too short or are header/footer
-    if (lower.length < 6) continue;
     const words = lower.split(/\s+/);
-    const skipRatio = words.filter(w => skipWords.some(s => w.includes(s))).length / words.length;
-    if (skipRatio > 0.4) continue;
-    if (/^\d+[\.\s]/.test(line)) continue; // line numbers
-    if (/^[0-9\s\-−–()\/]+$/.test(line.replace(/\s/g, ''))) continue; // only numbers/symbols
+    const skipRatio = words.filter(w => skipWords.some(s => w.startsWith(s) || w === s)).length / words.length;
+    if (skipRatio > 0.5) continue;
+    if (/^[\d\s\.\-\/\(\)]+$/.test(line.replace(/[×xX*@]/g, '').trim())) continue;
+    if (/^\d+[\.\s\)]/.test(line) && !/[a-zA-Z]/.test(line)) continue;
 
-    // Try to extract: name, quantity, amount/rate
-    // Pattern 1: Name  Qty  Rate  Amount  (e.g., "Paracetamol 500mg  10  5.00  50.00")
-    // Pattern 2: Name  Qty  Amount  (e.g., "Paracetamol 10  50.00")
-    // Pattern 3: Name  Amount  (e.g., "Paracetamol  50.00")
+    // Extract all numbers (including decimals)
+    const numMatches = [...line.matchAll(/(\d+\.?\d*)/g)].map(m => ({ val: m[1], idx: m.index }));
+    if (numMatches.length < 1) continue;
 
-    const numbers = line.match(/\d+\.?\d*/g) || [];
-    if (numbers.length < 1) continue;
+    // Find the last number - likely the amount
+    const lastNum = numMatches[numMatches.length - 1];
+    const amount = parseFloat(lastNum.val);
 
-    // Find price-like numbers (decimal or large)
-    const prices = numbers.filter(n => n.includes('.') || parseFloat(n) > 10);
-    const qtyCandidates = numbers.filter(n => !n.includes('.') && parseFloat(n) <= 999);
-
-    let name = line;
+    // Find potential quantity (integer before the last number)
     let quantity = 1;
-    let rate = 0;
-    let amount = 0;
-
-    if (prices.length >= 2) {
-      // Name  Qty  Rate  Amount
-      rate = parseFloat(prices[0]);
-      amount = parseFloat(prices[1]);
-      const lastPriceIdx = line.lastIndexOf(prices[1]);
-      const secondLastPriceIdx = line.lastIndexOf(prices[0], lastPriceIdx - 1);
-      name = line.substring(0, Math.min(secondLastPriceIdx, lastPriceIdx)).trim();
-      if (qtyCandidates.length > 0) {
-        const qtyStr = qtyCandidates[qtyCandidates.length - 1];
-        const qtyIdx = line.indexOf(qtyStr);
-        if (qtyIdx > 0 && qtyIdx < Math.min(secondLastPriceIdx, lastPriceIdx)) {
-          quantity = parseInt(qtyStr);
-        }
-      }
-    } else if (prices.length === 1) {
-      // Name  Amount  (with optional qty)
-      amount = parseFloat(prices[0]);
-      const priceIdx = line.lastIndexOf(prices[0]);
-      name = line.substring(0, priceIdx).trim();
-      if (qtyCandidates.length > 0) {
-        const qtyStr = qtyCandidates[qtyCandidates.length - 1];
-        const qtyIdx = line.indexOf(qtyStr);
-        if (qtyIdx > 0 && qtyIdx < priceIdx) {
-          quantity = parseInt(qtyStr);
-        }
+    for (let i = numMatches.length - 2; i >= 0; i--) {
+      const n = numMatches[i];
+      if (!n.val.includes('.') && parseInt(n.val) <= 999) {
+        quantity = parseInt(n.val);
+        break;
       }
     }
 
-    name = name.replace(/[×xX*]\s*\d+/g, '').replace(/@\s*\d+\.?\d*/g, '').trim();
-    name = name.replace(/[^a-zA-Z0-9\s\.\-\/]/g, '').trim();
+    // Name is everything before the numbers, cleaned up
+    let name = line;
+    // Remove trailing numbers and special chars
+    name = name.replace(/\s*[\d\.]+\s*$/, '').trim();
+    // If there are still trailing numbers, remove them
+    name = name.replace(/\s+\d+\.?\d*\s*[×xX*@]?\s*\d*\.?\d*\s*$/, '').trim();
+    // Remove extra whitespace and special chars
+    name = name.replace(/[^a-zA-Z0-9\s\.\-\/]/g, ' ').trim();
     name = name.replace(/\s+/g, ' ');
 
-    if (name.length < 3) continue;
+    if (name.length < 2) continue;
     if (skipWords.some(w => name.toLowerCase().includes(w))) continue;
-    if (items.some(i => i.name.toLowerCase() === name.toLowerCase())) continue;
+
+    // Skip if very similar to last item
+    if (items.length > 0) {
+      const last = items[items.length - 1].name.toLowerCase();
+      if (last.includes(name.toLowerCase()) || name.toLowerCase().includes(last)) continue;
+    }
 
     items.push({
       name,
@@ -116,9 +101,11 @@ function parseBillText(text) {
       selling_price: Math.max(0, amount / Math.max(1, quantity)),
       amount: Math.max(0, amount),
     });
+
+    if (items.length >= 80) break;
   }
 
-  return items.slice(0, 100);
+  return items;
 }
 
 router.post('/extract', auth, (req, res) => {

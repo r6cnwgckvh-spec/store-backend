@@ -47,9 +47,11 @@ export default function ScanBillScreen({ navigation }) {
         })));
         setStage('review');
       } else {
-        setItems([{ name: '', barcode: '', quantity: '1', cost_price: '', selling_price: '', category: '' }]);
+        setItems(data.text ? [] : [{ name: '', barcode: '', quantity: '1', cost_price: '', selling_price: '', category: '' }]);
         setStage('review');
-        Alert.alert('No items found', 'Could not auto-detect items. Please enter them manually.');
+        if (!data.text) {
+          Alert.alert('No text detected', 'Could not read text from the image. Try a clearer photo.');
+        }
       }
     } catch (e) {
       Alert.alert('OCR Failed', e.message + '\n\nEnter items manually.');
