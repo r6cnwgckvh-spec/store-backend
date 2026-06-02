@@ -32,6 +32,7 @@ import CategoriesScreen from './src/screens/CategoriesScreen';
 import ShoppingListsScreen from './src/screens/ShoppingListsScreen';
 import ShoppingListDetailScreen from './src/screens/ShoppingListDetailScreen';
 import ScanBillScreen from './src/screens/ScanBillScreen';
+import BillsScreen from './src/screens/BillsScreen';
 import Sidebar from './src/components/Sidebar';
 
 const Tab = createBottomTabNavigator();
@@ -159,6 +160,7 @@ function AppContent() {
             <Stack.Screen name="ShoppingLists" component={ShoppingListsScreen} />
             <Stack.Screen name="ShoppingListDetail" component={ShoppingListDetailScreen} />
             <Stack.Screen name="ScanBill" component={ScanBillScreen} />
+            <Stack.Screen name="Bills" component={BillsScreen} />
           </Stack.Navigator>
         </NavigationContainer>
         <Sidebar

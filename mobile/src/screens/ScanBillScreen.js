@@ -1,77 +1,46 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Alert, Image, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../context/ThemeContext';
 import { api } from '../api';
 
 export default function ScanBillScreen({ navigation }) {
   const { colors } = useTheme();
-  const [image, setImage] = useState(null);
-  const [items, setItems] = useState([]);
-  const [rawText, setRawText] = useState('');
-  const [processing, setProcessing] = useState(false);
+  const [items, setItems] = useState([emptyItem()]);
   const [submitting, setSubmitting] = useState(false);
-  const [stage, setStage] = useState('capture'); // 'capture' | 'review' | 'done'
 
-  const pickImage = async (fromGallery) => {
-    const permission = fromGallery
-      ? await ImagePicker.requestMediaLibraryPermissionsAsync()
-      : await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert('Permission needed', fromGallery ? 'Gallery permission is required.' : 'Camera permission is required.');
-      return;
-    }
-
-    const result = await (fromGallery
-      ? ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.6, base64: true })
-      : ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.6, base64: true }));
-
-    if (result.canceled || !result.assets?.length) return;
-
-    const asset = result.assets[0];
-    setImage(asset.uri);
-    setProcessing(true);
-
-    try {
-      const data = await api.post('/bill-scan/extract', { image: asset.base64 });
-      setRawText(data.text || '');
-      if (data.items?.length > 0) {
-        setItems(data.items.map(item => ({
-          name: item.name || '',
-          barcode: item.barcode || '',
-          quantity: String(item.quantity || 1),
-          cost_price: String(item.cost_price || ''),
-          selling_price: item.selling_price > 0 ? String(item.selling_price.toFixed(2)) : '',
-          category: item.category || '',
-        })));
-        setStage('review');
-      } else {
-        setItems(data.text ? [] : [{ name: '', barcode: '', quantity: '1', cost_price: '', selling_price: '', category: '' }]);
-        setStage('review');
-        if (!data.text) {
-          Alert.alert('No text detected', 'Could not read text from the image. Try a clearer photo.');
-        }
-      }
-    } catch (e) {
-      Alert.alert('OCR Failed', e.message + '\n\nEnter items manually.');
-      setItems([{ name: '', barcode: '', quantity: '1', cost_price: '', selling_price: '', category: '' }]);
-      setStage('review');
-    }
-    setProcessing(false);
-  };
+  function emptyItem() {
+    return {
+      name: '',
+      barcode: '',
+      is_medicine: false,
+      tablets_per_strip: '10',
+      stock: '',
+      strips: '',
+      cost_price: '',
+      selling_price: '',
+      category: '',
+      expiry_date: '',
+    };
+  }
 
   const updateItem = (index, field, value) => {
     setItems(items.map((item, i) => i === index ? { ...item, [field]: value } : item));
   };
 
-  const addItem = () => {
-    setItems([...items, { name: '', barcode: '', quantity: '1', cost_price: '', selling_price: '', category: '' }]);
-  };
+  const addItem = () => setItems([...items, emptyItem()]);
 
   const removeItem = (index) => {
     if (items.length <= 1) return;
     setItems(items.filter((_, i) => i !== index));
+  };
+
+  const toggleMedicine = (index) => {
+    setItems(items.map((item, i) => i === index ? { ...item, is_medicine: !item.is_medicine } : item));
+  };
+
+  const openBarcodeScanner = (index) => {
+    navigation.navigate('Scanner', { onBarCodeScanned: (barcode) => updateItem(index, 'barcode', barcode) });
   };
 
   const handleSubmit = async () => {
@@ -87,10 +56,13 @@ export default function ScanBillScreen({ navigation }) {
         items: validItems.map(item => ({
           name: item.name.trim(),
           barcode: item.barcode.trim() || undefined,
-          quantity: parseInt(item.quantity) || 1,
+          is_medicine: item.is_medicine,
+          quantity: item.is_medicine ? (parseInt(item.strips) || 1) : (parseInt(item.stock) || 1),
+          tablets_per_strip: item.is_medicine ? (parseInt(item.tablets_per_strip) || 10) : 1,
           cost_price: parseFloat(item.cost_price) || 0,
           selling_price: parseFloat(item.selling_price) || 0,
           category: item.category.trim(),
+          expiry_date: item.expiry_date.trim(),
         })),
       };
       const result = await api.post('/bill-scan', payload);
@@ -100,7 +72,8 @@ export default function ScanBillScreen({ navigation }) {
         result.skipped?.length ? `Skipped: ${result.skipped.length} items` : '',
       ].filter(Boolean).join('\n');
       Alert.alert('Saved to Inventory', msg || 'Done', [
-        { text: 'OK', onPress: () => { setItems([]); setImage(null); setRawText(''); setStage('capture'); } },
+        { text: 'Add More', onPress: () => setItems([emptyItem()]) },
+        { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     } catch (e) {
       Alert.alert('Error', e.message);
@@ -108,82 +81,7 @@ export default function ScanBillScreen({ navigation }) {
     setSubmitting(false);
   };
 
-  const reset = () => {
-    setItems([]);
-    setImage(null);
-    setRawText('');
-    setStage('capture');
-  };
-
   const styles = createStyles(colors);
-
-  if (stage === 'review') {
-    return (
-      <SafeAreaView style={styles.safe}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={reset} style={styles.backBtn}>
-            <Text style={styles.backText}>← New Scan</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Review Items</Text>
-          <View style={{ width: 70 }} />
-        </View>
-
-        <ScrollView style={styles.body} contentContainerStyle={{ paddingBottom: 40 }}>
-          {image && (
-            <Image source={{ uri: image }} style={styles.reviewPreview} resizeMode="contain" />
-          )}
-
-          {rawText ? (
-            <TouchableOpacity onPress={() => Alert.alert('Raw OCR Text', rawText)}>
-              <Text style={styles.rawTextLink}>View raw OCR text</Text>
-            </TouchableOpacity>
-          ) : null}
-
-          <Text style={styles.sectionTitle}>
-            Items ({items.length})
-          </Text>
-
-          {items.map((item, index) => (
-            <View key={index} style={styles.itemCard}>
-              <View style={styles.itemHeader}>
-                <Text style={styles.itemNumber}>#{index + 1}</Text>
-                <TouchableOpacity onPress={() => removeItem(index)}>
-                  <Text style={styles.removeText}>Remove</Text>
-                </TouchableOpacity>
-              </View>
-              <TextInput style={styles.input} placeholder="Product name *" placeholderTextColor={colors.placeholder}
-                value={item.name} onChangeText={(v) => updateItem(index, 'name', v)} />
-              <TextInput style={styles.input} placeholder="Barcode (optional)" placeholderTextColor={colors.placeholder}
-                value={item.barcode} onChangeText={(v) => updateItem(index, 'barcode', v)} />
-              <View style={styles.row}>
-                <TextInput style={[styles.input, styles.halfInput]} placeholder="Qty" placeholderTextColor={colors.placeholder}
-                  value={item.quantity} onChangeText={(v) => updateItem(index, 'quantity', v)} keyboardType="numeric" />
-                <TextInput style={[styles.input, styles.halfInput]} placeholder="Category" placeholderTextColor={colors.placeholder}
-                  value={item.category} onChangeText={(v) => updateItem(index, 'category', v)} />
-              </View>
-              <View style={styles.row}>
-                <TextInput style={[styles.input, styles.halfInput]} placeholder="Cost Price" placeholderTextColor={colors.placeholder}
-                  value={item.cost_price} onChangeText={(v) => updateItem(index, 'cost_price', v)} keyboardType="decimal-pad" />
-                <TextInput style={[styles.input, styles.halfInput]} placeholder="Selling Price" placeholderTextColor={colors.placeholder}
-                  value={item.selling_price} onChangeText={(v) => updateItem(index, 'selling_price', v)} keyboardType="decimal-pad" />
-              </View>
-            </View>
-          ))}
-
-          <TouchableOpacity style={styles.addBtn} onPress={addItem}>
-            <Text style={styles.addBtnText}>+ Add Missing Item</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={[styles.submitBtn, submitting && styles.submitBtnDisabled]}
-            onPress={handleSubmit} disabled={submitting}>
-            <Text style={styles.submitBtnText}>
-              {submitting ? 'Saving...' : `Save ${items.filter(i => i.name.trim()).length} Items to Inventory`}
-            </Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -191,46 +89,104 @@ export default function ScanBillScreen({ navigation }) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Text style={styles.backText}>← Back</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Scan Bill</Text>
+        <Text style={styles.headerTitle}>Add Multiple Items</Text>
         <View style={{ width: 60 }} />
       </View>
 
       <ScrollView style={styles.body} contentContainerStyle={{ paddingBottom: 40 }}>
-        {processing ? (
-          <View style={styles.processingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.processingText}>Scanning bill with OCR...</Text>
-            <Text style={styles.processingSub}>Extracting items from image</Text>
-          </View>
-        ) : (
-          <View style={styles.imageSection}>
-            <View style={styles.placeholder}>
-              <Text style={styles.placeholderIcon}>🧾</Text>
-              <Text style={styles.placeholderTitle}>Scan Supplier Bill</Text>
-              <Text style={styles.placeholderText}>
-                Take a photo of the bill{'\n'}Items will be auto-detected
-              </Text>
-              <View style={styles.imageButtons}>
-                <TouchableOpacity style={styles.imageBtn} onPress={() => pickImage(false)}>
-                  <Text style={styles.imageBtnText}>📷 Camera</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.imageBtn, { backgroundColor: colors.textMuted }]} onPress={() => pickImage(true)}>
-                  <Text style={styles.imageBtnText}>🖼️ Gallery</Text>
+        {items.map((item, index) => (
+          <View key={index} style={styles.itemCard}>
+            <View style={styles.itemHeader}>
+              <Text style={styles.itemNumber}>Item #{index + 1}</Text>
+              <View style={styles.itemHeaderRight}>
+                <TouchableOpacity onPress={() => removeItem(index)}>
+                  <Text style={styles.removeText}>Remove</Text>
                 </TouchableOpacity>
               </View>
             </View>
-          </View>
-        )}
 
-        {!processing && (
-          <View style={styles.infoBox}>
-            <Text style={styles.infoTitle}>How it works</Text>
-            <Text style={styles.infoText}>1. Take a clear photo of the supplier bill</Text>
-            <Text style={styles.infoText}>2. OCR extracts items automatically</Text>
-            <Text style={styles.infoText}>3. Review and edit items</Text>
-            <Text style={styles.infoText}>4. Save all to inventory</Text>
+            <TextInput style={styles.input} placeholder="Product name *" placeholderTextColor={colors.placeholder}
+              value={item.name} onChangeText={(v) => updateItem(index, 'name', v)} />
+
+            <View style={styles.barcodeRow}>
+              <TextInput style={[styles.input, { flex: 1, marginBottom: 0 }]}
+                placeholder="Barcode (optional)" placeholderTextColor={colors.placeholder}
+                value={item.barcode} onChangeText={(v) => updateItem(index, 'barcode', v)} />
+              <TouchableOpacity style={styles.scanBtn} onPress={() => openBarcodeScanner(index)}>
+                <Text style={styles.scanBtnText}>Scan</Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity style={styles.toggleRow} onPress={() => toggleMedicine(index)}>
+              <Text style={styles.toggleLabel}>Type:</Text>
+              <View style={[styles.togglePill, item.is_medicine && styles.togglePillActive]}>
+                <Text style={[styles.togglePillText, item.is_medicine && styles.togglePillTextActive]}>Medicine</Text>
+              </View>
+              <Text style={styles.toggleOr}>/</Text>
+              <View style={[styles.togglePill, !item.is_medicine && styles.togglePillActive]}>
+                <Text style={[styles.togglePillText, !item.is_medicine && styles.togglePillTextActive]}>General</Text>
+              </View>
+            </TouchableOpacity>
+
+            {item.is_medicine ? (
+              <View style={styles.row}>
+                <View style={styles.halfBlock}>
+                  <Text style={styles.fieldLabel}>Tablets per strip</Text>
+                  <TextInput style={styles.input} placeholder="10" placeholderTextColor={colors.placeholder}
+                    value={item.tablets_per_strip} onChangeText={(v) => updateItem(index, 'tablets_per_strip', v)} keyboardType="numeric" />
+                </View>
+                <View style={styles.halfBlock}>
+                  <Text style={styles.fieldLabel}>Strips (stock)</Text>
+                  <TextInput style={styles.input} placeholder="1" placeholderTextColor={colors.placeholder}
+                    value={item.strips} onChangeText={(v) => updateItem(index, 'strips', v)} keyboardType="numeric" />
+                </View>
+              </View>
+            ) : (
+              <View>
+                <Text style={styles.fieldLabel}>Stock quantity</Text>
+                <TextInput style={styles.input} placeholder="1" placeholderTextColor={colors.placeholder}
+                  value={item.stock} onChangeText={(v) => updateItem(index, 'stock', v)} keyboardType="numeric" />
+              </View>
+            )}
+
+            <View style={styles.row}>
+              <View style={styles.halfBlock}>
+                <Text style={styles.fieldLabel}>Cost Price</Text>
+                <TextInput style={styles.input} placeholder="0" placeholderTextColor={colors.placeholder}
+                  value={item.cost_price} onChangeText={(v) => updateItem(index, 'cost_price', v)} keyboardType="decimal-pad" />
+              </View>
+              <View style={styles.halfBlock}>
+                <Text style={styles.fieldLabel}>Selling Price</Text>
+                <TextInput style={styles.input} placeholder="0" placeholderTextColor={colors.placeholder}
+                  value={item.selling_price} onChangeText={(v) => updateItem(index, 'selling_price', v)} keyboardType="decimal-pad" />
+              </View>
+            </View>
+
+            <View style={styles.row}>
+              <View style={styles.halfBlock}>
+                <Text style={styles.fieldLabel}>Category</Text>
+                <TextInput style={styles.input} placeholder="e.g. Tablets" placeholderTextColor={colors.placeholder}
+                  value={item.category} onChangeText={(v) => updateItem(index, 'category', v)} />
+              </View>
+              <View style={styles.halfBlock}>
+                <Text style={styles.fieldLabel}>Expiry Date</Text>
+                <TextInput style={styles.input} placeholder="MM/YYYY" placeholderTextColor={colors.placeholder}
+                  value={item.expiry_date} onChangeText={(v) => updateItem(index, 'expiry_date', v)} />
+              </View>
+            </View>
           </View>
-        )}
+        ))}
+
+        <TouchableOpacity style={styles.addBtn} onPress={addItem}>
+          <Text style={styles.addBtnText}>+ Add Another Item</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={[styles.submitBtn, submitting && styles.submitBtnDisabled]}
+          onPress={handleSubmit} disabled={submitting}>
+          <Text style={styles.submitBtnText}>
+            {submitting ? 'Saving...' : `Save ${items.filter(i => i.name.trim()).length} Items to Inventory`}
+          </Text>
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
@@ -246,39 +202,31 @@ const createStyles = (colors) => StyleSheet.create({
   backText: { fontSize: 16, color: colors.headerText, fontWeight: '600' },
   headerTitle: { fontSize: 18, fontWeight: '700', color: colors.headerText },
   body: { flex: 1, padding: 16 },
-  processingContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 80 },
-  processingText: { fontSize: 17, fontWeight: '600', color: colors.text, marginTop: 20 },
-  processingSub: { fontSize: 13, color: colors.textMuted, marginTop: 6 },
-  imageSection: { marginBottom: 20 },
-  reviewPreview: { width: '100%', height: 160, borderRadius: 10, backgroundColor: colors.card, marginBottom: 12 },
-  rawTextLink: { fontSize: 13, color: colors.primary, textAlign: 'center', marginBottom: 12, textDecorationLine: 'underline' },
-  placeholder: {
-    backgroundColor: colors.card, borderRadius: 12, padding: 32,
-    alignItems: 'center', borderWidth: 2, borderColor: colors.border, borderStyle: 'dashed',
-  },
-  placeholderIcon: { fontSize: 56, marginBottom: 12 },
-  placeholderTitle: { fontSize: 18, fontWeight: '700', color: colors.text, marginBottom: 6 },
-  placeholderText: { fontSize: 14, color: colors.textMuted, marginBottom: 20, textAlign: 'center', lineHeight: 20 },
-  imageButtons: { flexDirection: 'row', gap: 12 },
-  imageBtn: { paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8, backgroundColor: colors.primary },
-  imageBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  infoBox: { backgroundColor: colors.card, borderRadius: 10, padding: 16, marginTop: 8 },
-  infoTitle: { fontSize: 15, fontWeight: '700', color: colors.text, marginBottom: 8 },
-  infoText: { fontSize: 13, color: colors.textMuted, lineHeight: 20 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 12, marginTop: 8 },
   itemCard: {
     backgroundColor: colors.card, borderRadius: 10, padding: 14, marginBottom: 12,
     borderWidth: 1, borderColor: colors.border,
   },
   itemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  itemNumber: { fontSize: 13, fontWeight: '700', color: colors.primary },
+  itemNumber: { fontSize: 14, fontWeight: '700', color: colors.primary },
+  itemHeaderRight: { flexDirection: 'row', gap: 12 },
   removeText: { fontSize: 13, color: colors.danger, fontWeight: '600' },
   input: {
     backgroundColor: colors.inputBg, borderRadius: 6, paddingHorizontal: 12, paddingVertical: 10,
     fontSize: 14, color: colors.text, borderWidth: 1, borderColor: colors.border, marginBottom: 8,
   },
+  barcodeRow: { flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 8 },
+  scanBtn: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 6, backgroundColor: colors.primary },
+  scanBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 8 },
+  toggleLabel: { fontSize: 14, color: colors.text, fontWeight: '600' },
+  togglePill: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 16, backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border },
+  togglePillActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  togglePillText: { fontSize: 13, color: colors.textMuted, fontWeight: '600' },
+  togglePillTextActive: { color: '#fff' },
+  toggleOr: { fontSize: 13, color: colors.textMuted },
+  fieldLabel: { fontSize: 12, color: colors.textMuted, marginBottom: 4, marginTop: -4 },
   row: { flexDirection: 'row', gap: 8 },
-  halfInput: { flex: 1 },
+  halfBlock: { flex: 1 },
   addBtn: {
     padding: 14, borderRadius: 8, borderWidth: 2, borderColor: colors.primary,
     borderStyle: 'dashed', alignItems: 'center', marginBottom: 16,
