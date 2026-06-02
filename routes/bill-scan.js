@@ -1,7 +1,30 @@
 const express = require('express');
 const router = express.Router();
 const https = require('https');
+const jwt = require('jsonwebtoken');
 const db = require('../database');
+
+function getSecret() {
+  const row = db.prepare('SELECT jwt_secret, id FROM store_settings WHERE user_id = 1').get();
+  if (row?.jwt_secret) return row.jwt_secret;
+  const crypto = require('crypto');
+  const secret = crypto.randomBytes(32).toString('hex');
+  if (row?.id) {
+    db.prepare('UPDATE store_settings SET jwt_secret = ? WHERE id = ?').run(secret, row.id);
+  } else {
+    db.prepare('INSERT INTO store_settings (user_id, jwt_secret, store_name, address, phone) VALUES (1, ?, ?, ?, ?)').run(secret, 'Your Store Name', '123 Main Street, City', '+91 98765 43210');
+  }
+  return secret;
+}
+
+function auth(req, res, next) {
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith('Bearer ')) return res.status(401).json({ error: 'Authentication required' });
+  try {
+    req.user = jwt.verify(header.slice(7), getSecret());
+    next();
+  } catch { return res.status(401).json({ error: 'Invalid or expired token' }); }
+}
 
 function getApiKey() {
   if (process.env.GCP_API_KEY) return process.env.GCP_API_KEY;
@@ -94,7 +117,7 @@ function parseBillText(text) {
   return items.slice(0, 100);
 }
 
-router.post('/extract', (req, res) => {
+router.post('/extract', auth, (req, res) => {
   const { image } = req.body;
   if (!image) return res.status(400).json({ error: 'Image data is required' });
 
@@ -136,7 +159,7 @@ router.post('/extract', (req, res) => {
   apiReq.end();
 });
 
-router.post('/', (req, res) => {
+router.post('/', auth, (req, res) => {
   const { items, notes, image_data } = req.body;
   if (!items || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ error: 'At least one item is required' });

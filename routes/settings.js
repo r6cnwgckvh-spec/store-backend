@@ -36,33 +36,5 @@ router.put('/', (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-    settings = db.prepare('SELECT id, user_id, store_name, address, phone, email, tax_id, currency_symbol, currency_code, gcp_api_key FROM store_settings WHERE user_id = ?').get(req.user.userId);
-  }
-  const hasGcpKey = !!(settings.gcp_api_key || process.env.GCP_API_KEY);
-  res.json({ ...settings, has_gcp_api_key: hasGcpKey });
-});
-
-router.put('/', (req, res) => {
-  const { store_name, address, phone, email, tax_id, currency_symbol, currency_code, gcp_api_key } = req.body;
-  try {
-    const result = db.prepare(`
-      UPDATE store_settings SET store_name = ?, address = ?, phone = ?, email = ?, tax_id = ?, currency_symbol = ?, currency_code = ?, gcp_api_key = ?
-      WHERE user_id = ?
-    `).run(
-      store_name || '', address || '', phone || '', email || '', tax_id || '',
-      currency_symbol || '\u20B9', currency_code || 'INR', gcp_api_key || '', req.user.userId
-    );
-    if (result.changes === 0) {
-      db.prepare('INSERT INTO store_settings (user_id, store_name, address, phone, email, tax_id, currency_symbol, currency_code, gcp_api_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
-        req.user.userId, store_name || '', address || '', phone || '', email || '', tax_id || '', currency_symbol || '\u20B9', currency_code || 'INR', gcp_api_key || ''
-      );
-    }
-    const settings = db.prepare('SELECT id, user_id, store_name, address, phone, email, tax_id, currency_symbol, currency_code, gcp_api_key FROM store_settings WHERE user_id = ?').get(req.user.userId);
-    const hasGcpKey = !!(settings.gcp_api_key || process.env.GCP_API_KEY);
-    res.json({ ...settings, has_gcp_api_key: hasGcpKey });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
 module.exports = router;

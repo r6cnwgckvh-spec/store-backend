@@ -34,7 +34,7 @@ export default function ScanBillScreen({ navigation }) {
     setProcessing(true);
 
     try {
-      const data = await api.post('/bill-scan/ocr', { image: asset.base64 });
+      const data = await api.post('/bill-scan/extract', { image: asset.base64 });
       setRawText(data.text || '');
       if (data.items?.length > 0) {
         setItems(data.items.map(item => ({
