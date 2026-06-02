@@ -34,14 +34,17 @@ export function AuthProvider({ children }) {
   }, []);
 
   const checkStoredAuth = useCallback(async () => {
+    const timeout = setTimeout(() => {
+      setLoading(false);
+    }, 8000);
+
     try {
       const storedPinHash = await storage.getPinHash();
       setHasLocalPin(!!storedPinHash);
 
       const storedToken = await storage.getToken();
-      if (!storedToken) { setLoading(false); return; }
+      if (!storedToken) { clearTimeout(timeout); setLoading(false); return; }
 
-      // Validate token with server
       const storedUser = await storage.getUser();
       try {
         const freshUser = await api.get('/auth/me');
@@ -49,7 +52,6 @@ export function AuthProvider({ children }) {
         setToken(storedToken);
         await storage.setUser(freshUser);
       } catch {
-        // If server unreachable but we have cached data, allow login with PIN
         if (storedUser && storedPinHash) {
           setUser(storedUser);
           setToken(storedToken);
@@ -65,6 +67,7 @@ export function AuthProvider({ children }) {
     } catch (e) {
       console.warn('checkStoredAuth error:', e);
     }
+    clearTimeout(timeout);
     setLoading(false);
   }, []);
 
