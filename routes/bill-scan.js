@@ -94,7 +94,7 @@ function parseBillText(text) {
   return items.slice(0, 100);
 }
 
-router.post('/ocr', (req, res) => {
+router.post('/extract', (req, res) => {
   const { image } = req.body;
   if (!image) return res.status(400).json({ error: 'Image data is required' });
 
