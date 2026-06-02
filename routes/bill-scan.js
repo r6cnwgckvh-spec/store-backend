@@ -1,6 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const https = require('https');
 const jwt = require('jsonwebtoken');
 const db = require('../database');
 
@@ -26,219 +25,8 @@ function auth(req, res, next) {
   } catch { return res.status(401).json({ error: 'Invalid or expired token' }); }
 }
 
-function getApiKey() {
-  if (process.env.OCR_SPACE_API_KEY) return process.env.OCR_SPACE_API_KEY;
-  const row = db.prepare('SELECT ocr_space_api_key FROM store_settings WHERE user_id = 1').get();
-  if (row?.ocr_space_api_key) return row.ocr_space_api_key;
-  if (process.env.GCP_API_KEY) return `gcp:${process.env.GCP_API_KEY}`;
-  const gcp = db.prepare('SELECT gcp_api_key FROM store_settings WHERE user_id = 1').get();
-  if (gcp?.gcp_api_key) return `gcp:${gcp.gcp_api_key}`;
-  return 'K87715764688957';
-}
-
-function parseBillText(text) {
-  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 1);
-  const items = [];
-  const skipWords = ['total', 'gst', 'tax', 'bill', 'invoice', 'store', 'shop', 'address',
-    'phone', 'date', 'cash', 'change', 'discount', 'subtotal', 'particulars',
-    'description', 'thank', 'welcome', 'mrp', 'batch', 'expiry', 'free', 'offer',
-    'cgst', 'sgst', 'igst', 'round', 'off', 'save', 'saved',
-    'rate', 'amount', 'qty', 'hsn', 'sac', 'price',
-    'credit', 'debit', 'card', 'counter', 'sale', 'payment',
-    'change', 'tender', 'receipt', 'copy', 'original', 'duplicate',
-    'item', 'name', 'sl', 'sri', 'page', 'print', 'time',
-    'contact', 'email', 'web', 'www', 'gstin', 'cin', 'pan',
-    'terms', 'condition', 'authorised', 'signature',
-    'delivery', 'shipping', 'billing', 'order', 'no', 'ref'];
-
-  for (const line of lines) {
-    const lower = line.toLowerCase();
-
-    // Quick skip for obviously non-item lines
-    if (lower.length > 60) continue;
-    if (/^[\d\s\-\/\(\):\.]+$/.test(line.replace(/[,|]/g, '').trim())) continue;
-    const wordCount = lower.split(/\s+/).length;
-    if (wordCount < 2) continue;
-
-    const skipHit = skipWords.some(s => {
-      const re = new RegExp('\\b' + s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
-      return re.test(lower);
-    });
-    if (skipHit) continue;
-
-    // Find all numbers with their positions
-    const numMatches = [];
-    const numRe = /(\d+\.?\d*)/g;
-    let m;
-    while ((m = numRe.exec(line)) !== null) {
-      numMatches.push({ val: m[1], idx: m.index, end: m.index + m[1].length });
-    }
-    if (numMatches.length < 1) continue;
-
-    // Find the last decimal number (this is the amount/price)
-    let amountIdx = -1;
-    let amount = 0;
-    for (let i = numMatches.length - 1; i >= 0; i--) {
-      if (numMatches[i].val.includes('.')) {
-        amount = parseFloat(numMatches[i].val);
-        amountIdx = i;
-        break;
-      }
-    }
-    // If no decimal found, use last number
-    if (amountIdx === -1) {
-      amountIdx = numMatches.length - 1;
-      amount = parseFloat(numMatches[amountIdx].val);
-    }
-
-    // Extract name: everything before the amount number
-    let name = line.substring(0, numMatches[amountIdx].idx).trim();
-
-    // If name is too short, try using the number before amount as name context
-    if (name.length < 2 && amountIdx > 0) {
-      name = line.substring(0, numMatches[amountIdx - 1].end).trim();
-    }
-
-    // Clean name
-    name = name.replace(/^[\d\s\.\-\)]+/, '').trim();
-    name = name.replace(/[^a-zA-Z0-9\s\.\-\/]/g, ' ').trim();
-    name = name.replace(/\s+/g, ' ');
-
-    if (name.length < 2) continue;
-    if (/^\d+$/.test(name.replace(/\s/g, ''))) continue;
-    if (skipWords.some(s => name.toLowerCase().includes(s))) continue;
-
-    // Find quantity: look for non-decimal number before the amount
-    let quantity = 1;
-    for (let i = amountIdx - 1; i >= 0; i--) {
-      const n = numMatches[i];
-      if (!n.val.includes('.') && parseInt(n.val) >= 1 && parseInt(n.val) <= 999) {
-        // Make sure this number is not part of the name (e.g., "500" in "500mg")
-        const beforeNum = line.substring(Math.max(0, n.idx - 3), n.idx).toLowerCase();
-        if (!beforeNum.match(/[a-z]/) && !line.substring(n.end, n.end + 2).match(/^[a-z]/)) {
-          quantity = parseInt(n.val);
-          break;
-        }
-      }
-    }
-
-    // Avoid exact duplicates
-    if (items.some(i => i.name.toLowerCase() === name.toLowerCase())) continue;
-
-    items.push({
-      name,
-      quantity: Math.max(1, quantity),
-      cost_price: 0,
-      selling_price: parseFloat(amount.toFixed(2)),
-      amount: Math.max(0, amount),
-    });
-
-    if (items.length >= 80) break;
-  }
-
-  return items;
-}
-
-router.post('/extract', auth, (req, res) => {
-  const { image } = req.body;
-  if (!image) return res.status(400).json({ error: 'Image data is required' });
-
-  const apiKey = getApiKey();
-  if (!apiKey) return res.status(400).json({ error: 'No OCR API key configured. Get a free key at https://ocr.space/ocrapi and save it in Settings.' });
-
-  if (apiKey.startsWith('gcp:')) {
-    // Fallback to Google Cloud Vision
-    const gcpKey = apiKey.slice(4);
-    const requestBody = JSON.stringify({
-      requests: [{
-        image: { content: image },
-        features: [{ type: 'TEXT_DETECTION', maxResults: 1 }],
-      }],
-    });
-    const options = {
-      hostname: 'vision.googleapis.com',
-      path: `/v1/images:annotate?key=${gcpKey}`,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-    };
-    const apiReq = https.request(options, (apiRes) => {
-      let data = '';
-      apiRes.on('data', (chunk) => data += chunk);
-      apiRes.on('end', () => {
-        try {
-          const result = JSON.parse(data);
-          if (result.error) return res.status(400).json({ error: result.error.message });
-          const text = result.responses?.[0]?.fullTextAnnotation?.text || '';
-          const items = parseBillText(text);
-          return res.json({ text, items, count: items.length });
-        } catch (e) {
-          return res.status(500).json({ error: 'Failed to parse OCR result' });
-        }
-      });
-    });
-    apiReq.on('error', (e) => res.status(500).json({ error: e.message }));
-    apiReq.write(requestBody);
-    apiReq.end();
-    return;
-  }
-
-  // Use OCR.space
-  const boundary = '----FormBoundary' + Math.random().toString(36).slice(2);
-  const body = [
-    `--${boundary}`,
-    'Content-Disposition: form-data; name="apikey"',
-    '',
-    apiKey,
-    `--${boundary}`,
-    'Content-Disposition: form-data; name="base64Image"',
-    '',
-    `data:image/jpeg;base64,${image}`,
-    `--${boundary}`,
-    'Content-Disposition: form-data; name="language"',
-    '',
-    'eng',
-    `--${boundary}`,
-    'Content-Disposition: form-data; name="isOverlayRequired"',
-    '',
-    'false',
-    `--${boundary}--`,
-  ].join('\r\n');
-
-  const options = {
-    hostname: 'api.ocr.space',
-    path: '/parse/image',
-    method: 'POST',
-    headers: {
-      'Content-Type': `multipart/form-data; boundary=${boundary}`,
-      'Content-Length': Buffer.byteLength(body),
-    },
-  };
-
-  const apiReq = https.request(options, (apiRes) => {
-    let data = '';
-    apiRes.on('data', (chunk) => data += chunk);
-    apiRes.on('end', () => {
-      try {
-        const result = JSON.parse(data);
-        if (result.IsErroredOnProcessing) {
-          return res.status(400).json({ error: result.ErrorMessage?.[0] || 'OCR failed' });
-        }
-        const text = (result.ParsedResults?.[0]?.ParsedText || '').trim();
-        const items = parseBillText(text);
-        res.json({ text, items, count: items.length });
-      } catch (e) {
-        res.status(500).json({ error: 'Failed to parse OCR result' });
-      }
-    });
-  });
-
-  apiReq.on('error', (e) => res.status(500).json({ error: e.message }));
-  apiReq.write(body);
-  apiReq.end();
-});
-
 router.post('/', auth, (req, res) => {
-  const { items, notes, image_data } = req.body;
+  const { items } = req.body;
   if (!items || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ error: 'At least one item is required' });
   }
@@ -257,6 +45,9 @@ router.post('/', auth, (req, res) => {
       const category = (item.category || '').trim();
       const barcode = (item.barcode || '').trim();
       const expiry_date = (item.expiry_date || '').trim();
+      const is_medicine = item.is_medicine === true;
+
+      const stock = is_medicine ? quantity * tablets_per_strip : quantity;
 
       let product = null;
       if (barcode) {
@@ -264,14 +55,14 @@ router.post('/', auth, (req, res) => {
       }
 
       if (product) {
-        const newStock = product.stock + quantity;
+        const newStock = product.stock + stock;
         const newPrice = selling_price > 0 ? selling_price : product.price;
         db.prepare('UPDATE products SET stock = ?, price = ?, cost_price = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
           .run(newStock, newPrice, cost_price > 0 ? cost_price : product.cost_price, product.id);
         results.updated.push({ id: product.id, name: product.name, stock: newStock });
         const pid = db.prepare(
           'INSERT INTO purchases (product_id, product_name, quantity, cost_price, supplier, notes, user_id) VALUES (?, ?, ?, ?, ?, ?, ?)'
-        ).run(product.id, product.name, quantity, cost_price, notes || '', '', req.user.userId).lastInsertRowid;
+        ).run(product.id, product.name, stock, cost_price, '', '', req.user.userId).lastInsertRowid;
         results.purchase_ids.push(pid);
       } else {
         const safeBarcode = barcode || `MANUAL-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
@@ -283,10 +74,10 @@ router.post('/', auth, (req, res) => {
         const pid = db.prepare(`
           INSERT INTO products (barcode, name, price, stock, cost_price, category, tablets_per_strip, expiry_date, image_url, user_id)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(safeBarcode, name, selling_price, quantity, cost_price, category, tablets_per_strip, expiry_date, image_data || '', req.user.userId).lastInsertRowid;
+        `).run(safeBarcode, name, selling_price, stock, cost_price, category, tablets_per_strip, expiry_date, '', req.user.userId).lastInsertRowid;
         const purchaseId = db.prepare(
           'INSERT INTO purchases (product_id, product_name, quantity, cost_price, supplier, notes, user_id) VALUES (?, ?, ?, ?, ?, ?, ?)'
-        ).run(pid, name, quantity, cost_price, notes || '', '', req.user.userId).lastInsertRowid;
+        ).run(pid, name, stock, cost_price, '', '', req.user.userId).lastInsertRowid;
         results.purchase_ids.push(purchaseId);
         results.created.push({ id: pid, name, barcode: safeBarcode });
       }

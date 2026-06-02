@@ -24,6 +24,7 @@ const adminRouter = require('./routes/admin');
 const adminDataRouter = require('./routes/admin-data');
 const shoppingListsRouter = require('./routes/shopping-lists');
 const billScanRouter = require('./routes/bill-scan');
+const billsRouter = require('./routes/bills');
 const authMiddleware = require('./middleware/auth');
 
 app.use(helmet({ crossOriginResourcePolicy: false, contentSecurityPolicy: false }));
@@ -47,6 +48,7 @@ app.use('/api/images', imagesRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/admin', adminDataRouter);
 app.use('/api/bill-scan', billScanRouter);
+app.use('/api/bills', billsRouter);
 
 app.use(authMiddleware);
 
