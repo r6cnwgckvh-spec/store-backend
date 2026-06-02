@@ -15,8 +15,11 @@ async function headers(extra = {}) {
 
 async function handleResponse(res) {
   if (res.status === 401) {
-    await clearToken();
-    if (onUnauthorized) onUnauthorized();
+    const hasToken = !!(await getToken());
+    if (hasToken) {
+      await clearToken();
+      if (onUnauthorized) onUnauthorized();
+    }
     throw new Error('Session expired. Please login again.');
   }
   if (!res.ok) {

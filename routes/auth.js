@@ -81,10 +81,10 @@ router.post('/login', authLimiter, (req, res) => {
   // Try new multi-user login
   if (email) {
     const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email.trim().toLowerCase());
-    if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+    if (!user) return res.status(400).json({ error: 'No account found with this email. Please register first.' });
     if (user.status !== 'approved') return res.status(403).json({ error: 'Account not approved yet' });
     if (!user.pin_hash) return res.status(400).json({ error: 'PIN not set up. Please set your PIN first.' });
-    if (hashPin(pin) !== user.pin_hash) return res.status(401).json({ error: 'Wrong PIN' });
+    if (hashPin(pin) !== user.pin_hash) return res.status(400).json({ error: 'Wrong PIN. Try again.' });
     const token = signToken(user);
     return res.json({ token, user: sanitizeUser(user) });
   }
@@ -102,7 +102,7 @@ router.post('/login', authLimiter, (req, res) => {
     }
   }
 
-  return res.status(401).json({ error: 'Wrong PIN' });
+  return res.status(400).json({ error: 'No account registered. Please register first.' });
 });
 
 router.post('/check-status', authLimiter, (req, res) => {
