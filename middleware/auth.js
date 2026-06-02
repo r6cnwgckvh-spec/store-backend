@@ -6,8 +6,15 @@ const publicRoutes = ['/api/health', '/api/auth/login', '/api/auth/status',
   '/api/images/', '/api/admin/'];
 
 function getSecret() {
-  const row = db.prepare('SELECT jwt_secret FROM store_settings WHERE user_id = 1').get();
-  return row?.jwt_secret || 'fallback-dev-secret';
+  const row = db.prepare('SELECT jwt_secret, id FROM store_settings WHERE user_id = 1').get();
+  if (row?.jwt_secret) return row.jwt_secret;
+  const secret = crypto.randomBytes(32).toString('hex');
+  if (row?.id) {
+    db.prepare('UPDATE store_settings SET jwt_secret = ? WHERE id = ?').run(secret, row.id);
+  } else {
+    db.prepare('INSERT INTO store_settings (user_id, jwt_secret, store_name, address, phone) VALUES (1, ?, ?, ?, ?)').run(secret, 'Your Store Name', '123 Main Street, City', '+91 98765 43210');
+  }
+  return secret;
 }
 
 function authMiddleware(req, res, next) {

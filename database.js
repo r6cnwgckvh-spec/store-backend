@@ -84,6 +84,9 @@ db.exec(`
     jwt_secret TEXT DEFAULT ''
   );
 
+  INSERT OR IGNORE INTO store_settings (user_id, store_name, address, phone)
+  VALUES (1, 'Your Store Name', '123 Main Street, City', '+91 98765 43210');
+
   CREATE TABLE IF NOT EXISTS purchases (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     product_id INTEGER NOT NULL,
