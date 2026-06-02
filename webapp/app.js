@@ -477,28 +477,32 @@ async function deleteProduct(id) {
   loading(false);
 }
 
-// ===== BARCODE SCANNER (simple camera + manual input) =====
+// ===== BARCODE SCANNER (auto-detect with BarcodeDetector API) =====
+let scanTimer = null;
+
 function openBarcodeModal(inputId) {
   openModal(`
-    <h3 style="margin-bottom:12px">📷 Enter Barcode</h3>
-    <div style="display:flex;gap:8px;margin-bottom:12px">
-      <input type="text" id="barcode-input" placeholder="Type barcode..." style="flex:1;margin-bottom:0" autofocus>
+    <h3 style="margin-bottom:12px">📷 Scan Barcode</h3>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <input type="text" id="barcode-input" placeholder="Or type barcode..." style="flex:1;margin-bottom:0" autofocus>
       <button class="btn-primary btn-sm" onclick="applyBarcode('${inputId}')" type="button">Apply</button>
     </div>
-    <div id="barcode-preview" style="margin-bottom:12px;max-height:200px;overflow:hidden;border-radius:6px;background:#000;display:none">
-      <video id="barcode-video" style="width:100%;max-height:200px" autoplay playsinline muted></video>
+    <div id="barcode-preview" style="margin-bottom:8px;max-height:220px;overflow:hidden;border-radius:6px;background:#000;display:none;position:relative">
+      <video id="barcode-video" style="width:100%;max-height:220px" autoplay playsinline muted></video>
+      <div id="barcode-scanned" style="position:absolute;bottom:8px;left:8px;right:8px;background:rgba(0,0,0,0.7);color:#0f0;padding:6px 10px;border-radius:4px;font-size:13px;display:none"></div>
     </div>
-    <button class="btn-outline btn-sm" onclick="toggleBarcodeCamera()" id="barcode-cam-btn" type="button">📷 Open Camera</button>
+    <button class="btn-outline btn-sm" onclick="toggleBarcodeCamera('${inputId}')" id="barcode-cam-btn" type="button">📷 Open Camera</button>
     <button class="btn-outline btn-block" style="margin-top:8px" onclick="closeModal()" type="button">Cancel</button>
   `);
   setTimeout(() => $('barcode-input')?.focus(), 100);
 }
 
-function toggleBarcodeCamera() {
+function toggleBarcodeCamera(inputId) {
   const preview = $('barcode-preview');
   const btn = $('barcode-cam-btn');
   if (!preview || !btn) return;
   if (cameraStream) {
+    if (scanTimer) { clearInterval(scanTimer); scanTimer = null; }
     cameraStream.getTracks().forEach(t => t.stop());
     cameraStream = null;
     preview.style.display = 'none';
@@ -506,12 +510,37 @@ function toggleBarcodeCamera() {
     return;
   }
   if (!navigator.mediaDevices?.getUserMedia) { showToast('Camera not available'); return; }
-  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }).then(stream => {
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } } }).then(stream => {
     cameraStream = stream;
     const video = $('barcode-video');
-    if (video) video.srcObject = stream;
+    if (video) { video.srcObject = stream; video.onloadedmetadata = () => video.play(); }
     preview.style.display = 'block';
     btn.textContent = '❌ Close Camera';
+
+    // Use BarcodeDetector API if available
+    if ('BarcodeDetector' in window) {
+      const detector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e', 'itf_14', 'qr_code', 'code_93', 'codabar', 'data_matrix', 'aztec'] });
+      const canvas = document.createElement('canvas');
+      const scannedDiv = $('barcode-scanned');
+      scanTimer = setInterval(() => {
+        if (!video || !video.videoWidth) return;
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0);
+        detector.detect(canvas).then(barcodes => {
+          if (barcodes.length > 0) {
+            const code = barcodes[0].rawValue;
+            if (scannedDiv) { scannedDiv.textContent = '✅ Scanned: ' + code; scannedDiv.style.display = 'block'; }
+            if ($('barcode-input')) $('barcode-input').value = code;
+            if (scanTimer) { clearInterval(scanTimer); scanTimer = null; }
+            if ($(inputId)) { $(inputId).value = code; setTimeout(closeModal, 800); }
+          }
+        }).catch(() => {});
+      }, 300);
+    } else {
+      showToast('Auto-scan not supported. Type barcode manually.', 2000);
+    }
   }).catch(() => showToast('Camera access denied'));
 }
 
