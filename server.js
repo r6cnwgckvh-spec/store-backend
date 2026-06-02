@@ -50,6 +50,16 @@ app.use('/api/bill-scan', billScanRouter);
 
 app.use(authMiddleware);
 
+app.use('/api/products', productsRouter);
+app.use('/api/customers', customersRouter);
+app.use('/api/orders', ordersRouter);
+app.use('/api/settings', settingsRouter);
+app.use('/api/reports', reportsRouter);
+app.use('/api/purchases', purchasesRouter);
+app.use('/api/categories', categoriesRouter);
+app.use('/api/backup', backupRouter);
+app.use('/api/shopping-lists', shoppingListsRouter);
+
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
