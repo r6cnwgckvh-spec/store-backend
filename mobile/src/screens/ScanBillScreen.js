@@ -1,13 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import { api } from '../api';
 
-export default function ScanBillScreen({ navigation }) {
+export default function ScanBillScreen({ navigation, route }) {
   const { colors } = useTheme();
   const [items, setItems] = useState([emptyItem()]);
   const [submitting, setSubmitting] = useState(false);
+  const pendingIndex = useRef(null);
+
+  useEffect(() => {
+    if (route.params?.scannedBarcode && pendingIndex.current !== null) {
+      updateItem(pendingIndex.current, 'barcode', route.params.scannedBarcode);
+      pendingIndex.current = null;
+      navigation.setParams({ scannedBarcode: undefined });
+    }
+  }, [route.params?.scannedBarcode]);
 
   function emptyItem() {
     return {
@@ -40,7 +49,8 @@ export default function ScanBillScreen({ navigation }) {
   };
 
   const openBarcodeScanner = (index) => {
-    navigation.navigate('Scanner', { onBarCodeScanned: (barcode) => updateItem(index, 'barcode', barcode) });
+    pendingIndex.current = index;
+    navigation.navigate('Scanner', { mode: 'return', returnTo: 'ScanBill' });
   };
 
   const handleSubmit = async () => {

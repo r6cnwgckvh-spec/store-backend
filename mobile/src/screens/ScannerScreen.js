@@ -40,6 +40,13 @@ export default function ScannerScreen({ route, navigation }) {
 
     if (mode === 'add') {
       navigation.navigate('Main', { screen: 'Products', params: { screen: 'AddProduct', params: { barcode: data } } });
+    } else if (mode === 'return') {
+      const returnTo = route.params?.returnTo;
+      if (returnTo) {
+        navigation.navigate(returnTo, { scannedBarcode: data });
+      } else {
+        navigation.goBack();
+      }
     } else {
       navigation.navigate('Main', { screen: 'Cart', params: { screen: 'CartMain', params: { scannedBarcode: data } } });
     }

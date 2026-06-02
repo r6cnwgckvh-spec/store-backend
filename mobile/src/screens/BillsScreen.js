@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Image, TextInput, ActivityIndicator } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Image, Modal, Dimensions, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../context/ThemeContext';
@@ -11,6 +11,7 @@ export default function BillsScreen({ navigation }) {
   const [bills, setBills] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [viewImage, setViewImage] = useState(null);
 
   useFocusEffect(useCallback(() => { loadBills(); }, []));
 
@@ -69,15 +70,9 @@ export default function BillsScreen({ navigation }) {
 
   const viewBill = (bill) => {
     Alert.alert('Bill Details', `Uploaded: ${new Date(bill.created_at).toLocaleDateString()}\nNotes: ${bill.notes || 'None'}`, [
-      { text: 'View Image', onPress: () => viewBillImage(bill) },
+      { text: 'View Image', onPress: () => setViewImage(bill.image_data) },
       { text: 'Delete', style: 'destructive', onPress: () => deleteBill(bill.id) },
       { text: 'OK' },
-    ]);
-  };
-
-  const viewBillImage = (bill) => {
-    Alert.alert('Bill Photo', '', [
-      { text: 'Close' },
     ]);
   };
 
@@ -141,6 +136,21 @@ export default function BillsScreen({ navigation }) {
           ))
         )}
       </ScrollView>
+
+      <Modal visible={!!viewImage} transparent animationType="fade" onRequestClose={() => setViewImage(null)}>
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity style={styles.modalClose} onPress={() => setViewImage(null)}>
+            <Text style={styles.modalCloseText}>✕ Close</Text>
+          </TouchableOpacity>
+          {viewImage && (
+            <Image
+              source={{ uri: `data:image/jpeg;base64,${viewImage}` }}
+              style={styles.modalImage}
+              resizeMode="contain"
+            />
+          )}
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -177,4 +187,10 @@ const createStyles = (colors) => StyleSheet.create({
   billDate: { fontSize: 15, fontWeight: '600', color: colors.text },
   billTime: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
   billNotes: { fontSize: 12, color: colors.primary, marginTop: 4 },
+  modalOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center',
+  },
+  modalClose: { position: 'absolute', top: 50, right: 16, zIndex: 10, padding: 8 },
+  modalCloseText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  modalImage: { width: Dimensions.get('window').width, height: Dimensions.get('window').height - 100 },
 });
