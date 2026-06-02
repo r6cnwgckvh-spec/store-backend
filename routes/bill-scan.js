@@ -27,9 +27,13 @@ function auth(req, res, next) {
 }
 
 function getApiKey() {
-  if (process.env.GCP_API_KEY) return process.env.GCP_API_KEY;
-  const row = db.prepare('SELECT gcp_api_key FROM store_settings WHERE user_id = 1').get();
-  return row?.gcp_api_key || '';
+  if (process.env.OCR_SPACE_API_KEY) return process.env.OCR_SPACE_API_KEY;
+  const row = db.prepare('SELECT ocr_space_api_key FROM store_settings WHERE user_id = 1').get();
+  if (row?.ocr_space_api_key) return row.ocr_space_api_key;
+  if (process.env.GCP_API_KEY) return `gcp:${process.env.GCP_API_KEY}`;
+  const gcp = db.prepare('SELECT gcp_api_key FROM store_settings WHERE user_id = 1').get();
+  if (gcp?.gcp_api_key) return `gcp:${gcp.gcp_api_key}`;
+  return '';
 }
 
 function parseBillText(text) {
@@ -122,20 +126,74 @@ router.post('/extract', auth, (req, res) => {
   if (!image) return res.status(400).json({ error: 'Image data is required' });
 
   const apiKey = getApiKey();
-  if (!apiKey) return res.status(400).json({ error: 'Google Cloud Vision API key not configured. Set GCP_API_KEY in Settings or environment.' });
+  if (!apiKey) return res.status(400).json({ error: 'No OCR API key configured. Get a free key at https://ocr.space/ocrapi and save it in Settings.' });
 
-  const requestBody = JSON.stringify({
-    requests: [{
-      image: { content: image },
-      features: [{ type: 'TEXT_DETECTION', maxResults: 1 }],
-    }],
-  });
+  if (apiKey.startsWith('gcp:')) {
+    // Fallback to Google Cloud Vision
+    const gcpKey = apiKey.slice(4);
+    const requestBody = JSON.stringify({
+      requests: [{
+        image: { content: image },
+        features: [{ type: 'TEXT_DETECTION', maxResults: 1 }],
+      }],
+    });
+    const options = {
+      hostname: 'vision.googleapis.com',
+      path: `/v1/images:annotate?key=${gcpKey}`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    };
+    const apiReq = https.request(options, (apiRes) => {
+      let data = '';
+      apiRes.on('data', (chunk) => data += chunk);
+      apiRes.on('end', () => {
+        try {
+          const result = JSON.parse(data);
+          if (result.error) return res.status(400).json({ error: result.error.message });
+          const text = result.responses?.[0]?.fullTextAnnotation?.text || '';
+          const items = parseBillText(text);
+          return res.json({ text, items, count: items.length });
+        } catch (e) {
+          return res.status(500).json({ error: 'Failed to parse OCR result' });
+        }
+      });
+    });
+    apiReq.on('error', (e) => res.status(500).json({ error: e.message }));
+    apiReq.write(requestBody);
+    apiReq.end();
+    return;
+  }
+
+  // Use OCR.space
+  const boundary = '----FormBoundary' + Math.random().toString(36).slice(2);
+  const body = [
+    `--${boundary}`,
+    'Content-Disposition: form-data; name="apikey"',
+    '',
+    apiKey,
+    `--${boundary}`,
+    'Content-Disposition: form-data; name="base64Image"',
+    '',
+    `data:image/jpeg;base64,${image}`,
+    `--${boundary}`,
+    'Content-Disposition: form-data; name="language"',
+    '',
+    'eng',
+    `--${boundary}`,
+    'Content-Disposition: form-data; name="isOverlayRequired"',
+    '',
+    'false',
+    `--${boundary}--`,
+  ].join('\r\n');
 
   const options = {
-    hostname: 'vision.googleapis.com',
-    path: `/v1/images:annotate?key=${apiKey}`,
+    hostname: 'api.ocr.space',
+    path: '/parse/image',
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': `multipart/form-data; boundary=${boundary}`,
+      'Content-Length': Buffer.byteLength(body),
+    },
   };
 
   const apiReq = https.request(options, (apiRes) => {
@@ -144,8 +202,10 @@ router.post('/extract', auth, (req, res) => {
     apiRes.on('end', () => {
       try {
         const result = JSON.parse(data);
-        if (result.error) return res.status(400).json({ error: result.error.message });
-        const text = result.responses?.[0]?.fullTextAnnotation?.text || '';
+        if (result.IsErroredOnProcessing) {
+          return res.status(400).json({ error: result.ErrorMessage?.[0] || 'OCR failed' });
+        }
+        const text = (result.ParsedResults?.[0]?.ParsedText || '').trim();
         const items = parseBillText(text);
         res.json({ text, items, count: items.length });
       } catch (e) {
@@ -155,7 +215,7 @@ router.post('/extract', auth, (req, res) => {
   });
 
   apiReq.on('error', (e) => res.status(500).json({ error: e.message }));
-  apiReq.write(requestBody);
+  apiReq.write(body);
   apiReq.end();
 });
 

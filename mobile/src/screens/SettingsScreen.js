@@ -16,7 +16,7 @@ export default function SettingsScreen({ navigation }) {
   const [currency, setCurrency] = useState('\u20B9');
   const [currencyCode, setCurrencyCode] = useState('INR');
   const [gcpApiKey, setGcpApiKey] = useState('');
-  const [hasGcpKey, setHasGcpKey] = useState(false);
+  const [hasOcrKey, setHasOcrKey] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showChangePin, setShowChangePin] = useState(false);
   const [oldPin, setOldPin] = useState('');
@@ -51,7 +51,7 @@ export default function SettingsScreen({ navigation }) {
         setTaxId(s.tax_id || '');
         setCurrency(s.currency_symbol || '\u20B9');
         setCurrencyCode(s.currency_code || 'INR');
-        setHasGcpKey(s.has_gcp_api_key || false);
+        setHasOcrKey(s.has_ocr_api_key || false);
       } catch (e) { console.error(e); }
       setLoading(false);
     })();
@@ -68,8 +68,9 @@ export default function SettingsScreen({ navigation }) {
         currency_symbol: currency.trim() || '\u20B9',
         currency_code: currencyCode.trim() || 'INR',
         gcp_api_key: gcpApiKey.trim(),
+        ocr_space_api_key: gcpApiKey.trim(),
       });
-      setHasGcpKey(result.has_gcp_api_key || false);
+      setHasOcrKey(result.has_ocr_api_key || false);
       Alert.alert('Saved', 'Settings updated!');
     } catch (e) { Alert.alert('Error', e.message); }
   };
@@ -122,9 +123,9 @@ export default function SettingsScreen({ navigation }) {
           <TextInput style={[styles.input, { flex: 1 }]} value={currencyCode} onChangeText={setCurrencyCode} placeholder="INR" placeholderTextColor={colors.placeholder} />
         </View>
 
-        <Text style={[styles.label, { marginTop: 4 }]}>Google Cloud Vision API Key</Text>
+        <Text style={[styles.label, { marginTop: 4 }]}>OCR API Key (ocr.space)</Text>
         <Text style={{ fontSize: 11, color: colors.textLight, marginBottom: 8, marginLeft: 2 }}>
-          {hasGcpKey ? '✅ Key configured' : 'Required for auto OCR bill scanning'}
+          {hasOcrKey ? '✅ Key configured' : 'Get a free key at ocr.space/ocrapi'}
         </Text>
         <TextInput style={styles.input} value={gcpApiKey} onChangeText={setGcpApiKey}
           placeholder="Paste your API key here" placeholderTextColor={colors.placeholder}
