@@ -15,6 +15,7 @@ const menuItems = [
   { icon: '📊', label: 'Reports', screen: 'Reports' },
   { icon: '🏷️', label: 'Categories', screen: 'Categories' },
   { icon: '📋', label: 'Shopping Lists', screen: 'ShoppingLists' },
+  { icon: '🧾', label: 'Scan Bill', screen: 'ScanBill' },
   { icon: '📷', label: 'Scan Barcode', screen: 'Scanner', params: {} },
   { icon: '⚙️', label: 'Settings', screen: 'Settings' },
   { icon: '👑', label: 'Admin Panel', screen: 'AdminPanel' },

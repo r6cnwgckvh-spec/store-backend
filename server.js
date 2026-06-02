@@ -23,6 +23,7 @@ const imagesRouter = require('./routes/images');
 const adminRouter = require('./routes/admin');
 const adminDataRouter = require('./routes/admin-data');
 const shoppingListsRouter = require('./routes/shopping-lists');
+const billScanRouter = require('./routes/bill-scan');
 const authMiddleware = require('./middleware/auth');
 
 app.use(helmet({ crossOriginResourcePolicy: false, contentSecurityPolicy: false }));
@@ -57,6 +58,7 @@ app.use('/api/purchases', purchasesRouter);
 app.use('/api/categories', categoriesRouter);
 app.use('/api/backup', backupRouter);
 app.use('/api/shopping-lists', shoppingListsRouter);
+app.use('/api/bill-scan', billScanRouter);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
