@@ -162,10 +162,12 @@ try {
         email TEXT DEFAULT '',
         tax_id TEXT DEFAULT '',
         currency_symbol TEXT DEFAULT '\u20B9',
-        currency_code TEXT DEFAULT 'INR'
+        currency_code TEXT DEFAULT 'INR',
+        auth_pin TEXT DEFAULT '',
+        jwt_secret TEXT DEFAULT ''
       );
-      INSERT INTO store_settings_new (store_name, address, phone, email, tax_id, currency_symbol, currency_code, user_id)
-        SELECT store_name, address, phone, email, tax_id, COALESCE(currency_symbol,'\u20B9'), COALESCE(currency_code,'INR'), 1 FROM store_settings;
+      INSERT INTO store_settings_new (store_name, address, phone, email, tax_id, currency_symbol, currency_code, user_id, auth_pin, jwt_secret)
+        SELECT store_name, address, phone, email, tax_id, COALESCE(currency_symbol,'\u20B9'), COALESCE(currency_code,'INR'), 1, COALESCE(auth_pin,''), COALESCE(jwt_secret,'') FROM store_settings;
       DROP TABLE store_settings;
       ALTER TABLE store_settings_new RENAME TO store_settings;
     `);

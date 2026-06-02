@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, Image, StyleSheet, FlatList, TouchableOpacity, TextInput, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { api } from '../api';
 import { formatCurrency, stockStatus, getImageUrl } from '../utils/helpers';
 import { useTheme } from '../context/ThemeContext';
