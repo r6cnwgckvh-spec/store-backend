@@ -37,68 +37,99 @@ function getApiKey() {
 }
 
 function parseBillText(text) {
-  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 1);
   const items = [];
   const skipWords = ['total', 'gst', 'tax', 'bill', 'invoice', 'store', 'shop', 'address',
     'phone', 'date', 'cash', 'change', 'discount', 'subtotal', 'particulars',
     'description', 'thank', 'welcome', 'mrp', 'batch', 'expiry', 'free', 'offer',
-    'cgst', 'sgst', 'igst', 'round', 'off', 'save', 'you', 'saved',
-    'item', 'rate', 'amount', 'qty', 'hsn', 'sac', 'name', 'price',
-    'credit', 'debit', 'card', 'cashier', 'counter', 'sale', 'payment',
-    'change', 'tender', 'receipt', 'copy', 'original', 'duplicate'];
+    'cgst', 'sgst', 'igst', 'round', 'off', 'save', 'saved',
+    'rate', 'amount', 'qty', 'hsn', 'sac', 'price',
+    'credit', 'debit', 'card', 'counter', 'sale', 'payment',
+    'change', 'tender', 'receipt', 'copy', 'original', 'duplicate',
+    'item', 'name', 'sl', 'sri', 'page', 'print', 'time',
+    'contact', 'email', 'web', 'www', 'gstin', 'cin', 'pan',
+    'terms', 'condition', 'authorised', 'signature',
+    'delivery', 'shipping', 'billing', 'order', 'no', 'ref'];
 
   for (const line of lines) {
-    const lower = line.toLowerCase().trim();
-    if (lower.length < 4) continue;
+    const lower = line.toLowerCase();
 
-    const words = lower.split(/\s+/);
-    const skipRatio = words.filter(w => skipWords.some(s => w.startsWith(s) || w === s)).length / words.length;
-    if (skipRatio > 0.5) continue;
-    if (/^[\d\s\.\-\/\(\)]+$/.test(line.replace(/[×xX*@]/g, '').trim())) continue;
-    if (/^\d+[\.\s\)]/.test(line) && !/[a-zA-Z]/.test(line)) continue;
+    // Quick skip for obviously non-item lines
+    if (lower.length > 60) continue;
+    if (/^[\d\s\-\/\(\):\.]+$/.test(line.replace(/[,|]/g, '').trim())) continue;
+    const wordCount = lower.split(/\s+/).length;
+    if (wordCount < 2) continue;
 
-    // Extract all numbers (including decimals)
-    const numMatches = [...line.matchAll(/(\d+\.?\d*)/g)].map(m => ({ val: m[1], idx: m.index }));
+    const skipHit = skipWords.some(s => {
+      const re = new RegExp('\\b' + s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
+      return re.test(lower);
+    });
+    if (skipHit) continue;
+
+    // Find all numbers with their positions
+    const numMatches = [];
+    const numRe = /(\d+\.?\d*)/g;
+    let m;
+    while ((m = numRe.exec(line)) !== null) {
+      numMatches.push({ val: m[1], idx: m.index, end: m.index + m[1].length });
+    }
     if (numMatches.length < 1) continue;
 
-    // Find the last number - likely the amount
-    const lastNum = numMatches[numMatches.length - 1];
-    const amount = parseFloat(lastNum.val);
-
-    // Find potential quantity (integer before the last number)
-    let quantity = 1;
-    for (let i = numMatches.length - 2; i >= 0; i--) {
-      const n = numMatches[i];
-      if (!n.val.includes('.') && parseInt(n.val) <= 999) {
-        quantity = parseInt(n.val);
+    // Find the last decimal number (this is the amount/price)
+    let amountIdx = -1;
+    let amount = 0;
+    for (let i = numMatches.length - 1; i >= 0; i--) {
+      if (numMatches[i].val.includes('.')) {
+        amount = parseFloat(numMatches[i].val);
+        amountIdx = i;
         break;
       }
     }
+    // If no decimal found, use last number
+    if (amountIdx === -1) {
+      amountIdx = numMatches.length - 1;
+      amount = parseFloat(numMatches[amountIdx].val);
+    }
 
-    // Name is everything before the numbers, cleaned up
-    let name = line;
-    // Remove trailing numbers and special chars
-    name = name.replace(/\s*[\d\.]+\s*$/, '').trim();
-    // If there are still trailing numbers, remove them
-    name = name.replace(/\s+\d+\.?\d*\s*[×xX*@]?\s*\d*\.?\d*\s*$/, '').trim();
-    // Remove extra whitespace and special chars
+    // Extract name: everything before the amount number
+    let name = line.substring(0, numMatches[amountIdx].idx).trim();
+
+    // If name is too short, try using the number before amount as name context
+    if (name.length < 2 && amountIdx > 0) {
+      name = line.substring(0, numMatches[amountIdx - 1].end).trim();
+    }
+
+    // Clean name
+    name = name.replace(/^[\d\s\.\-\)]+/, '').trim();
     name = name.replace(/[^a-zA-Z0-9\s\.\-\/]/g, ' ').trim();
     name = name.replace(/\s+/g, ' ');
 
     if (name.length < 2) continue;
-    if (skipWords.some(w => name.toLowerCase().includes(w))) continue;
+    if (/^\d+$/.test(name.replace(/\s/g, ''))) continue;
+    if (skipWords.some(s => name.toLowerCase().includes(s))) continue;
 
-    // Skip if very similar to last item
-    if (items.length > 0) {
-      const last = items[items.length - 1].name.toLowerCase();
-      if (last.includes(name.toLowerCase()) || name.toLowerCase().includes(last)) continue;
+    // Find quantity: look for non-decimal number before the amount
+    let quantity = 1;
+    for (let i = amountIdx - 1; i >= 0; i--) {
+      const n = numMatches[i];
+      if (!n.val.includes('.') && parseInt(n.val) >= 1 && parseInt(n.val) <= 999) {
+        // Make sure this number is not part of the name (e.g., "500" in "500mg")
+        const beforeNum = line.substring(Math.max(0, n.idx - 3), n.idx).toLowerCase();
+        if (!beforeNum.match(/[a-z]/) && !line.substring(n.end, n.end + 2).match(/^[a-z]/)) {
+          quantity = parseInt(n.val);
+          break;
+        }
+      }
     }
+
+    // Avoid exact duplicates
+    if (items.some(i => i.name.toLowerCase() === name.toLowerCase())) continue;
 
     items.push({
       name,
       quantity: Math.max(1, quantity),
       cost_price: 0,
-      selling_price: Math.max(0, amount / Math.max(1, quantity)),
+      selling_price: parseFloat(amount.toFixed(2)),
       amount: Math.max(0, amount),
     });
 
