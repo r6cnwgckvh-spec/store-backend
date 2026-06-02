@@ -244,7 +244,9 @@ async function loadUsers() {
       const isAdmin = u.role === 'admin';
       const date = new Date(u.created_at).toLocaleDateString();
       const isSelected = selectedUserId === u.id;
-      return `<tr class="clickable" onclick="selectUser(${u.id},${JSON.stringify(u.name)},${JSON.stringify(u.email)})" style="${isSelected ? 'background:rgba(233,69,96,0.12);' : ''}">
+      const nameEnc = encodeURIComponent(u.name);
+      const emailEnc = encodeURIComponent(u.email);
+      return `<tr class="clickable" onclick="selectUser(${u.id},'${nameEnc}','${emailEnc}')" style="${isSelected ? 'background:rgba(233,69,96,0.12);' : ''}">
         <td>${u.id}</td>
         <td><strong>${esc(u.name)}</strong></td>
         <td>${esc(u.email)}</td>
@@ -252,10 +254,10 @@ async function loadUsers() {
         <td>${isAdmin ? '<span style="color:#e94560">Admin</span>' : 'User'}</td>
         <td style="color:#666;font-size:12px">${date}</td>
         <td class="actions">
-          <button class="btn-sm btn-secondary" onclick="event.stopPropagation();selectUser(${u.id},${JSON.stringify(u.name)},${JSON.stringify(u.email)})">View</button>
+          <button class="btn-sm btn-secondary" onclick="event.stopPropagation();selectUser(${u.id},'${nameEnc}','${emailEnc}')">View</button>
           ${isPending ? `<button class="btn-xs btn-success" onclick="event.stopPropagation();approveUser(${u.id})">Approve</button>
           <button class="btn-xs btn-danger" onclick="event.stopPropagation();rejectUser(${u.id})">Reject</button>` : ''}
-          ${!isAdmin ? `<button class="btn-xs btn-danger" onclick="event.stopPropagation();deleteUser(${u.id},${JSON.stringify(u.name)})">Delete</button>` : ''}
+          ${!isAdmin ? `<button class="btn-xs btn-danger" onclick="event.stopPropagation();deleteUser(${u.id},'${nameEnc}')">Delete</button>` : ''}
         </td>
       </tr>`;
     }).join('');
@@ -267,8 +269,8 @@ async function loadUsers() {
 
 function selectUser(id, name, email) {
   selectedUserId = id;
-  document.getElementById('detail-user-name').textContent = name;
-  document.getElementById('detail-user-email').textContent = `ID: ${id} | Email: ${email}`;
+  document.getElementById('detail-user-name').textContent = decodeURIComponent(name);
+  document.getElementById('detail-user-email').textContent = `ID: ${id} | Email: ${decodeURIComponent(email)}`;
   document.getElementById('user-detail').style.display = 'block';
   selectedDetailTab = 'products';
   document.querySelectorAll('#detail-tabs .tab').forEach(t => t.classList.remove('active'));
@@ -360,7 +362,7 @@ async function loadDetailCustomers(container) {
       <td><strong>${esc(c.name)}</strong></td>
       <td>${esc(c.phone) || '-'}</td>
       <td>${esc(c.email) || '-'}</td>
-      <td><button class="btn-xs btn-danger" onclick="confirmDeleteCustomer(${c.id},${JSON.stringify(c.name)})">Delete</button></td>
+      <td><button class="btn-xs btn-danger" onclick="confirmDeleteCustomer(${c.id},'${encodeURIComponent(c.name)}')">Delete</button></td>
     </tr>`).join('')}</tbody>
   </table>`;
 }
@@ -512,6 +514,7 @@ async function deleteOrder(orderId) {
 }
 
 function confirmDeleteCustomer(customerId, name) {
+  name = decodeURIComponent(name);
   const inner = document.getElementById('modal-inner');
   inner.innerHTML = `
     <h2>Delete Customer</h2>
@@ -550,6 +553,7 @@ async function rejectUser(id) {
 }
 
 async function deleteUser(id, name) {
+  name = decodeURIComponent(name);
   if (!confirm(`Delete user "${name}"? This cannot be undone.`)) return;
   try { await apiFetch(`/admin/users/${id}`, { method: 'DELETE' }); if (selectedUserId === id) closeDetail(); await loadUsers(); }
   catch (e) { alert('Error: ' + e.message); }

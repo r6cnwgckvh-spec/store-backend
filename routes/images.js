@@ -1,11 +1,15 @@
 const express = require('express');
 const router = express.Router();
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const db = require('../database');
 
 function getSecret() {
   const row = db.prepare('SELECT jwt_secret FROM store_settings WHERE user_id = 1').get();
-  return row?.jwt_secret || 'fallback-dev-secret';
+  if (row?.jwt_secret) return row.jwt_secret;
+  const secret = crypto.randomBytes(32).toString('hex');
+  db.prepare('UPDATE store_settings SET jwt_secret = ? WHERE user_id = 1').run(secret);
+  return secret;
 }
 
 router.post('/', (req, res) => {

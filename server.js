@@ -39,15 +39,39 @@ const globalLimiter = rateLimit({
 });
 app.use(globalLimiter);
 
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many login attempts, try again later' },
+});
+
+const backupLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Backup/restore rate limit exceeded' },
+});
+
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
+app.use((req, res, next) => {
+  if (['POST', 'PUT', 'PATCH'].includes(req.method) && req.headers['content-type'] !== 'application/json' && !req.path.startsWith('/admin')) {
+    return res.status(415).json({ error: 'Content-Type must be application/json' });
+  }
+  next();
+});
+
 app.use('/admin', express.static(path.join(__dirname, 'admin')));
 
-app.use('/api/auth', authRouter);
+app.use('/api/auth', authLimiter, authRouter);
 app.use('/api/images', imagesRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/admin', adminDataRouter);
+app.use('/api/backup', backupLimiter);
 app.use('/api/bill-scan', billScanRouter);
 app.use('/api/bills', billsRouter);
 

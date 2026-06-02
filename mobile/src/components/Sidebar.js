@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, Linking } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, Linking, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 
@@ -99,14 +99,14 @@ export default function Sidebar({ visible, onClose, navigationRef }) {
               <Text style={styles.closeText}>✕</Text>
             </TouchableOpacity>
           </View>
-          <View style={styles.menu}>
+          <ScrollView style={styles.menu} showsVerticalScrollIndicator={false}>
             {menuItems.map((item) => (
               <TouchableOpacity key={item.screen} style={styles.menuItem} onPress={() => handlePress(item)}>
                 <Text style={styles.menuIcon}>{item.icon}</Text>
                 <Text style={styles.menuLabel}>{item.label}</Text>
               </TouchableOpacity>
             ))}
-          </View>
+          </ScrollView>
           <View style={styles.footer}>
             <Text style={styles.watermark}>Made by Kishan ❤️</Text>
           </View>
