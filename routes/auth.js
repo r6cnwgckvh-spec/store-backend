@@ -182,4 +182,36 @@ router.get('/me', (req, res) => {
   }
 });
 
+router.post('/setup', (req, res) => {
+  const { email, pin } = req.body;
+  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email?.trim().toLowerCase());
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  const transaction = db.transaction(() => {
+    db.prepare('UPDATE users SET role = ?, status = ?, pin_hash = ? WHERE id = ?')
+      .run('admin', 'approved', hashPin(pin), user.id);
+    const others = db.prepare('SELECT id FROM users WHERE id != ?').all(user.id);
+    for (const o of others) {
+      const id = o.id;
+      const prodIds = db.prepare('SELECT id FROM products WHERE user_id = ?').all(id).map(r => r.id);
+      for (const pid of prodIds) {
+        db.prepare('DELETE FROM order_items WHERE product_id = ?').run(pid);
+      }
+      db.prepare('DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE user_id = ?)').run(id);
+      db.prepare('DELETE FROM orders WHERE user_id = ?').run(id);
+      db.prepare('DELETE FROM products WHERE user_id = ?').run(id);
+      db.prepare('DELETE FROM customers WHERE user_id = ?').run(id);
+      db.prepare('DELETE FROM purchases WHERE user_id = ?').run(id);
+      db.prepare('DELETE FROM categories WHERE user_id = ?').run(id);
+      db.prepare('DELETE FROM shopping_list_items WHERE list_id IN (SELECT id FROM shopping_lists WHERE user_id = ?)').run(id);
+      db.prepare('DELETE FROM shopping_lists WHERE user_id = ?').run(id);
+      db.prepare('DELETE FROM bills WHERE user_id = ?').run(id);
+      db.prepare('DELETE FROM store_settings WHERE user_id = ?').run(id);
+      db.prepare('DELETE FROM users WHERE id = ?').run(id);
+    }
+  });
+  transaction();
+  res.json({ message: 'Admin setup complete. Other users deleted.' });
+});
+
 module.exports = router;
